@@ -32,6 +32,12 @@ const QrMenu = () => {
     return acc
   }, {})
 
+  // "Çaylar"ı başa taşı
+  const groupedWithTeaFirst = {
+    ...(grouped["Çaylar"] ? { "Çaylar": grouped["Çaylar"] } : {}),
+    ...Object.fromEntries(Object.entries(grouped).filter(([k]) => k !== "Çaylar"))
+  }
+
   const handleCategoryClick = (categoryName) => {
     const target = document.getElementById(`section-${categoryName}`)
     if (target) {
@@ -92,7 +98,7 @@ const QrMenu = () => {
 
       {/* Kategori Butonları */}
       <div className="flex overflow-x-auto space-x-3 pb-4 mb-6 scrollbar-hide snap-x snap-mandatory">
-        {Object.keys(grouped).map((cat) => (
+        {Object.keys(groupedWithTeaFirst).map((cat) => (
           <button
             key={cat}
             onClick={() => handleCategoryClick(cat)}
@@ -115,7 +121,7 @@ const QrMenu = () => {
 
       {/* Ürünler */}
       <div className="space-y-12">
-        {Object.entries(grouped).map(([category, items]) => (
+        {Object.entries(groupedWithTeaFirst).map(([category, items]) => (
           <div key={category} id={`section-${category}`} className="scroll-mt-24">
             <div className="relative mb-6 h-32 rounded-xl overflow-hidden shadow-md">
               <img
