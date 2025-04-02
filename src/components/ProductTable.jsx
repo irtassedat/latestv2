@@ -3,6 +3,7 @@ import { useReactToPrint } from "react-to-print"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
 import ReactPaginate from "react-paginate"
+import api from "../lib/api"
 
 const categoryColors = {
   "Tatlılar": "bg-pink-100 text-pink-800",
@@ -89,6 +90,26 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
     setShowModal(true)
   }
 
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data)
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const json = XLSX.utils.sheet_to_json(sheet)
+
+    // Veriyi backend'e POST et
+    try {
+      const res = await api.post("/products/bulk", { products: json })
+      alert(`✅ ${res.data.insertedCount} ürün eklendi`)
+      window.location.reload()
+    } catch (err) {
+      console.error("Excel import hatası:", err.message)
+      alert("❌ Excel'den ürün yüklenemedi.")
+    }
+  }
+
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,6 +133,19 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
             className="w-full md:w-64 border px-3 py-2 rounded"
           />
           <div className="flex gap-2">
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              className="hidden"
+              id="excel-upload"
+              onChange={handleExcelUpload}
+            />
+            <label
+              htmlFor="excel-upload"
+              className="bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 text-sm cursor-pointer"
+            >
+              Excel Yükle
+            </label>
             <button
               onClick={handleExportExcel}
               className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm"
