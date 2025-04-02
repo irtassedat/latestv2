@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react"
 import api from "../lib/axios"
+import * as XLSX from "xlsx"
+import { saveAs } from "file-saver"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([])
@@ -45,6 +49,45 @@ const AdminOrders = () => {
     }
   }
 
+  const handleExportExcel = () => {
+    const exportData = orders.map((order) => ({
+      Ad: order.name,
+      Masa: order.table_number,
+      Tutar: `${order.total_price} ₺`,
+      Ürünler: order.items?.map((i) => `${i.name} x${i.quantity}`).join(", "),
+      Tarih: new Date(order.created_at).toLocaleString(),
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Siparişler")
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    const data = new Blob([excelBuffer], { type: "application/octet-stream" })
+    saveAs(data, "siparisler.xlsx")
+  }
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF()
+    doc.text("Sipariş Listesi", 14, 10)
+
+    const tableData = orders.map((order) => [
+      order.name,
+      order.table_number,
+      `${order.total_price} ₺`,
+      order.items?.map((i) => `${i.name} x${i.quantity}`).join(", "),
+      new Date(order.created_at).toLocaleString(),
+    ])
+
+    doc.autoTable({
+      head: [["Ad", "Masa", "Tutar", "Ürünler", "Tarih"]],
+      body: tableData,
+      startY: 20,
+    })
+
+    doc.save("siparisler.pdf")
+  }
+
   // filtrelenmiş siparişler
   const filteredOrders = orders.filter(order =>
     order.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,6 +97,21 @@ const AdminOrders = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <h2 className="text-2xl font-bold mb-6">📋 Tüm Siparişler</h2>
+
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={handleExportExcel}
+          className="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm"
+        >
+          Excel'e Aktar
+        </button>
+        <button
+          onClick={handleExportPDF}
+          className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
+        >
+          PDF'ye Aktar
+        </button>
+      </div>
 
       <input
         type="text"
