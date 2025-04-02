@@ -88,6 +88,31 @@ const AdminOrders = () => {
     doc.save("siparisler.pdf")
   }
 
+  const handlePrint = () => {
+    const printContent = document.getElementById("print-section")
+    const WinPrint = window.open("", "", "width=900,height=650")
+    WinPrint.document.write(`
+      <html>
+        <head>
+          <title>Siparişler</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `)
+    WinPrint.document.close()
+    WinPrint.focus()
+    WinPrint.print()
+    WinPrint.close()
+  }
+
   // filtrelenmiş siparişler
   const filteredOrders = orders.filter(order =>
     order.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,6 +135,12 @@ const AdminOrders = () => {
           className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
         >
           PDF'ye Aktar
+        </button>
+        <button
+          onClick={handlePrint}
+          className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800 text-sm"
+        >
+          Yazdır
         </button>
       </div>
 
@@ -134,6 +165,35 @@ const AdminOrders = () => {
       {filteredOrders.length === 0 && (
         <p className="text-gray-500 mt-4">Aramanıza uygun sipariş bulunamadı.</p>
       )}
+
+      <div id="print-section">
+        <table className="w-full text-sm mt-4">
+          <thead>
+            <tr className="bg-gray-200">
+              <th className="p-2">Ad</th>
+              <th className="p-2">Masa</th>
+              <th className="p-2">Tutar</th>
+              <th className="p-2">Ürünler</th>
+              <th className="p-2">Tarih</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredOrders.map((order) => (
+              <tr key={order.id}>
+                <td className="p-2">{order.name}</td>
+                <td className="p-2">{order.table_number}</td>
+                <td className="p-2">{order.total_price} ₺</td>
+                <td className="p-2">
+                  {order.items?.map((i) => `${i.name} x${i.quantity}`).join(", ")}
+                </td>
+                <td className="p-2">
+                  {new Date(order.created_at).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {filteredOrders.map((order) => (
         <div
