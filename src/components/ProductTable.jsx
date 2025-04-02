@@ -166,11 +166,11 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd, categories }) => {
                   <td className="p-3">
                     <span
                       className={`text-xs font-medium px-2 py-1 rounded ${
-                        categoryColors[product.category_name] ||
+                        categoryColors[product.category_name || ""] ||
                         "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {product.category_name}
+                      {product.category_name || "Kategori Yok"}
                     </span>
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
