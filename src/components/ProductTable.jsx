@@ -328,6 +328,35 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
           </div>
         </div>
       )}
+
+      {/* Yazdırılacak tüm ürünlerin bulunduğu görünmeyen tablo */}
+      <div style={{ display: "none" }}>
+        <div ref={printRef}>
+          <h2 className="text-xl font-bold mb-4">Tüm Ürünler (Yazdır)</h2>
+          <table className="w-full text-sm border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-2 border">Ürün</th>
+                <th className="p-2 border">Kategori</th>
+                <th className="p-2 border">Fiyat</th>
+                <th className="p-2 border">Stok</th>
+                <th className="p-2 border">Açıklama</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((p) => (
+                <tr key={p.id}>
+                  <td className="p-2 border">{p.name}</td>
+                  <td className="p-2 border">{p.category_name}</td>
+                  <td className="p-2 border">{p.price} ₺</td>
+                  <td className="p-2 border">{p.stock}</td>
+                  <td className="p-2 border">{p.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
