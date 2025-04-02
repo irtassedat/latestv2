@@ -5,12 +5,14 @@ const AdminOrders = () => {
   const [orders, setOrders] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
+  const [editingOrder, setEditingOrder] = useState(null)
+
+  const fetchOrders = async () => {
+    const res = await api.get("/orders")
+    setOrders(res.data)
+  }
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      const res = await api.get("/orders")
-      setOrders(res.data)
-    }
     fetchOrders()
   }, [])
 
@@ -25,6 +27,21 @@ const AdminOrders = () => {
     } catch (err) {
       console.error("Silme hatası:", err)
       alert("Sipariş silinemedi.")
+    }
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    try {
+      await api.put(`/orders/${editingOrder.id}`, {
+        name: editingOrder.name,
+        table_number: editingOrder.table_number,
+      })
+      alert("Güncellendi!")
+      setEditingOrder(null)
+      fetchOrders()
+    } catch (err) {
+      console.error("Güncelleme hatası:", err)
     }
   }
 
@@ -78,7 +95,13 @@ const AdminOrders = () => {
               <p className="text-sm text-gray-600">🪑 Masa: {order.table_number}</p>
               <p className="text-sm text-gray-500">🕒 {new Date(order.created_at).toLocaleString()}</p>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditingOrder(order)}
+                className="text-blue-600 text-sm underline"
+              >
+                ✏️ Düzenle
+              </button>
               <div className="text-lg font-bold text-green-700 mr-4">{order.total_price} ₺</div>
               <button
                 className="text-red-500 text-sm hover:underline"
@@ -103,6 +126,50 @@ const AdminOrders = () => {
           )}
         </div>
       ))}
+
+      {editingOrder && (
+        <form
+          onSubmit={handleUpdate}
+          className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center z-50"
+        >
+          <div className="bg-white p-6 rounded shadow-lg w-[90%] max-w-md">
+            <h2 className="text-lg font-bold mb-4">📝 Siparişi Düzenle</h2>
+            <input
+              className="w-full border px-3 py-2 rounded mb-3"
+              value={editingOrder.name}
+              onChange={(e) =>
+                setEditingOrder({ ...editingOrder, name: e.target.value })
+              }
+              placeholder="Ad Soyad"
+              required
+            />
+            <input
+              className="w-full border px-3 py-2 rounded mb-3"
+              value={editingOrder.table_number}
+              onChange={(e) =>
+                setEditingOrder({ ...editingOrder, table_number: e.target.value })
+              }
+              placeholder="Masa No"
+              required
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingOrder(null)}
+                className="text-gray-600 underline"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   )
 }
