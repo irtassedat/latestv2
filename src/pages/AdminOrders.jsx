@@ -3,6 +3,7 @@ import api from "../lib/axios"
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([])
+  const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -12,34 +13,57 @@ const AdminOrders = () => {
     fetchOrders()
   }, [])
 
+  // filtrelenmiş siparişler
+  const filteredOrders = orders.filter(order =>
+    order.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h2 className="text-2xl font-bold mb-6">📋 Sipariş Listesi</h2>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <h2 className="text-2xl font-bold mb-6">📋 Tüm Siparişler</h2>
 
-      <div className="space-y-4">
-        {orders.map((order) => (
-          <div key={order.id} className="bg-white p-4 rounded shadow">
-            <p><strong>Ad:</strong> {order.name}</p>
-            <p><strong>Masa:</strong> {order.table_number}</p>
-            <p><strong>Tutar:</strong> ₺{order.total_price}</p>
-            <p><strong>Tarih:</strong> {new Date(order.created_at).toLocaleString()}</p>
-
-            {/* Eğer sipariş detayları (ürünler) varsa burada listeleyebilirsin */}
-            {order.items?.length > 0 && (
-              <div className="mt-2">
-                <p className="font-semibold">Ürünler:</p>
-                <ul className="list-disc list-inside text-sm">
-                  {order.items.map((item, index) => (
-                    <li key={index}>
-                      {item.name} x {item.quantity} – ₺{item.price}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Müşteri adına göre ara..."
+          className="w-full max-w-md border px-4 py-2 rounded shadow-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
+
+      {filteredOrders.length === 0 && (
+        <p className="text-gray-500 mt-4">Aramanıza uygun sipariş bulunamadı.</p>
+      )}
+
+      {filteredOrders.map((order) => (
+        <div
+          key={order.id}
+          className="bg-white rounded shadow p-4 mb-6 border-l-4 border-green-600"
+        >
+          <div className="flex justify-between items-center mb-2">
+            <div>
+              <p className="font-semibold">👤 {order.name}</p>
+              <p className="text-sm text-gray-600">🪑 Masa: {order.table_number}</p>
+              <p className="text-sm text-gray-500">🕒 {new Date(order.created_at).toLocaleString()}</p>
+            </div>
+            <div className="text-lg font-bold text-green-700">{order.total_price} ₺</div>
+          </div>
+
+          {order.items?.length > 0 && (
+            <ul className="text-sm text-gray-700 mt-2 space-y-1">
+              {order.items.map((item, i) => (
+                <li key={i} className="flex justify-between">
+                  <span>
+                    • {item.name} x {item.quantity}
+                  </span>
+                  <span>{item.price * item.quantity} ₺</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
