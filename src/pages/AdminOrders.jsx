@@ -4,6 +4,7 @@ import api from "../lib/axios"
 const AdminOrders = () => {
   const [orders, setOrders] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("")
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -14,9 +15,15 @@ const AdminOrders = () => {
   }, [])
 
   // filtrelenmiş siparişler
-  const filteredOrders = orders.filter(order =>
-    order.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredOrders = orders
+    .filter(order =>
+      order.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .filter(order =>
+      selectedDate
+        ? new Date(order.created_at).toISOString().slice(0, 10) === selectedDate
+        : true
+    )
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -29,6 +36,16 @@ const AdminOrders = () => {
           className="w-full max-w-md border px-4 py-2 rounded shadow-sm"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Tarihe göre filtrele</label>
+        <input
+          type="date"
+          className="border px-3 py-2 rounded shadow-sm"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
         />
       </div>
 
