@@ -17,9 +17,18 @@ const categoryColors = {
   "Salatalar": "bg-emerald-100 text-emerald-800",
 }
 
-const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
+const ProductTable = ({ products, onEdit, onDelete, onAdd, categories }) => {
   const [searchTerm, setSearchTerm] = useState("")
   const [page, setPage] = useState(0)
+  const [showModal, setShowModal] = useState(false)
+  const [editProduct, setEditProduct] = useState(null)
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    image_url: "",
+    price: "",
+    category_id: "",
+  })
   const printRef = useRef()
   const itemsPerPage = 10
 
@@ -44,6 +53,41 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
   })
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (editProduct) {
+      onEdit({ ...editProduct, ...form })
+    } else {
+      onAdd(form)
+    }
+    setShowModal(false)
+    setForm({
+      name: "",
+      description: "",
+      image_url: "",
+      price: "",
+      category_id: "",
+    })
+    setEditProduct(null)
+  }
+
+  const handleEditClick = (product) => {
+    setEditProduct(product)
+    setForm({
+      name: product.name,
+      description: product.description || "",
+      image_url: product.image_url || "",
+      price: product.price,
+      category_id: product.category_id,
+    })
+    setShowModal(true)
+  }
 
   const filteredProducts = products.filter(
     (product) =>
@@ -81,7 +125,7 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
               Yazdır
             </button>
             <button
-              onClick={onAdd}
+              onClick={() => setShowModal(true)}
               className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
             >
               + Yeni Ürün
@@ -141,7 +185,7 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
                   <td className="p-3 text-right whitespace-nowrap">
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => onEdit(product)}
+                        onClick={() => handleEditClick(product)}
                         className="text-blue-600 hover:text-blue-800"
                       >
                         ✏️
@@ -162,17 +206,84 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
       )}
 
       {filteredProducts.length > 0 && (
-        <div className="p-4 border-t">
+        <div className="overflow-x-auto px-4 pb-4">
           <ReactPaginate
             pageCount={Math.ceil(filteredProducts.length / itemsPerPage)}
             onPageChange={(e) => setPage(e.selected)}
-            containerClassName="flex justify-center gap-2"
+            containerClassName="flex justify-center gap-2 flex-wrap"
             activeClassName="font-bold text-blue-600"
             previousClassName="px-3 py-1 rounded hover:bg-gray-100"
             nextClassName="px-3 py-1 rounded hover:bg-gray-100"
             pageClassName="px-3 py-1 rounded hover:bg-gray-100"
             breakClassName="px-3 py-1"
           />
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md shadow-lg relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              onClick={() => setShowModal(false)}
+            >
+              ❌
+            </button>
+            <h2 className="text-xl font-bold mb-4">➕ Yeni Ürün</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Ürün Adı"
+                className="w-full p-2 border rounded"
+                required
+              />
+              <input
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="Açıklama"
+                className="w-full p-2 border rounded"
+              />
+              <input
+                name="image_url"
+                value={form.image_url}
+                onChange={handleChange}
+                placeholder="Görsel URL"
+                className="w-full p-2 border rounded"
+              />
+              <input
+                name="price"
+                value={form.price}
+                onChange={handleChange}
+                placeholder="Fiyat"
+                type="number"
+                className="w-full p-2 border rounded"
+                required
+              />
+              <select
+                name="category_id"
+                value={form.category_id}
+                onChange={handleChange}
+                className="w-full p-2 border rounded"
+                required
+              >
+                <option value="">Kategori Seç</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+              >
+                {editProduct ? "Güncelle" : "Ekle"}
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>

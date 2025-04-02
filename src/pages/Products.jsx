@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react"
 import api from "../lib/axios"
+import ProductTable from "../components/ProductTable"
 
 const Products = () => {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [editProduct, setEditProduct] = useState(null)
 
-  // Form verisi
+  const [formOpen, setFormOpen] = useState(false)
+
   const [form, setForm] = useState({
     name: "",
     description: "",
     image_url: "",
     price: "",
+    stock: "",
     category_id: "",
   })
 
-  // Ürünleri çek
   const fetchProducts = async () => {
     try {
       const res = await api.get("/products")
@@ -25,7 +27,6 @@ const Products = () => {
     }
   }
 
-  // Kategorileri çek
   const fetchCategories = async () => {
     try {
       const res = await api.get("/categories")
@@ -35,51 +36,48 @@ const Products = () => {
     }
   }
 
-  // Ürün silme fonksiyonu
   const handleDelete = async (id) => {
     if (!confirm("Bu ürünü silmek istediğinize emin misiniz?")) return
     try {
       await api.delete(`/products/${id}`)
-      fetchProducts() // Listeyi yeniden çek
+      fetchProducts()
     } catch (err) {
       console.error("Ürün silinemedi:", err.message)
     }
-  }  
+  }
 
-  // Form inputlarını yakala
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  // Form gönderilince ürün ekle
   const handleSubmit = async (e) => {
     e.preventDefault()
-  
     try {
       if (editProduct) {
-        // ✅ GÜNCELLEME
         await api.put(`/products/${editProduct.id}`, form)
       } else {
-        // ✅ YENİ EKLEME
         await api.post("/products", form)
       }
-  
-      setForm({
-        name: "",
-        description: "",
-        image_url: "",
-        price: "",
-        category_id: "",
-      })
-      setEditProduct(null)
+      resetForm()
       fetchProducts()
     } catch (err) {
       console.error("İşlem sırasında hata oluştu:", err.message)
     }
   }
-  
 
-  // Ürün düzenleme fonksiyonu
+  const resetForm = () => {
+    setForm({
+      name: "",
+      description: "",
+      image_url: "",
+      price: "",
+      stock: "",
+      category_id: "",
+    })
+    setEditProduct(null)
+    setFormOpen(false)
+  }
+
   const handleEdit = (product) => {
     setEditProduct(product)
     setForm({
@@ -87,112 +85,110 @@ const Products = () => {
       description: product.description || "",
       image_url: product.image_url || "",
       price: product.price,
+      stock: product.stock || 0,
       category_id: product.category_id,
     })
+    setFormOpen(true)
   }
-  
 
-  // İlk açıldığında ürünleri ve kategorileri getir
   useEffect(() => {
     fetchProducts()
     fetchCategories()
   }, [])
 
   return (
-    <div className="p-4">
-      {/* Ürün Listesi */}
-      <h1 className="text-2xl font-bold mb-6">🛒 Ürün Listesi</h1>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {products.map((product) => (
-          <div key={product.id} className="border p-4 rounded shadow bg-white">
-            <img
-              src={product.image_url || "https://placehold.co/30x30"}
-              alt={product.name}
-              onError={(e) => (e.target.src = "https://placehold.co/30x30")}
-              className="w-full h-32 object-cover rounded mb-2"
+    <div className="p-4 space-y-8">
+      <h1 className="text-2xl font-bold">📦 Ürün Yönetimi</h1>
+
+      <ProductTable
+        products={products}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onAdd={() => {
+          resetForm()
+          setFormOpen(true)
+        }}
+      />
+
+      {formOpen && (
+        <div className="bg-white shadow p-6 rounded max-w-xl">
+          <h2 className="text-xl font-semibold mb-4">
+            {editProduct ? "✏️ Ürünü Güncelle" : "➕ Yeni Ürün Ekle"}
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Ürün Adı"
+              className="w-full p-2 border rounded"
+              required
             />
-            <h2 className="font-bold text-lg">{product.name}</h2>
-            <p className="text-sm text-gray-600">{product.price} ₺</p>
-            <p className="text-xs italic text-gray-500">{product.category_name}</p>
-
-            <div className="flex gap-2 mt-2">
-              {/* Düzenle Butonu */}
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Açıklama"
+              className="w-full p-2 border rounded"
+            />
+            <input
+              name="image_url"
+              value={form.image_url}
+              onChange={handleChange}
+              placeholder="Görsel URL"
+              className="w-full p-2 border rounded"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                name="price"
+                value={form.price}
+                onChange={handleChange}
+                placeholder="Fiyat"
+                type="number"
+                className="w-full p-2 border rounded"
+                required
+              />
+              <input
+                name="stock"
+                value={form.stock}
+                onChange={handleChange}
+                placeholder="Stok"
+                type="number"
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <select
+              name="category_id"
+              value={form.category_id}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="">Kategori Seç</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-between">
               <button
-                onClick={() => handleEdit(product)}
-                className="text-sm bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
               >
-                Düzenle
+                {editProduct ? "Güncelle" : "Ekle"}
               </button>
-
-              {/* Silme Butonu */}
               <button
-                onClick={() => handleDelete(product.id)}
-                className="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                type="button"
+                className="text-sm text-gray-500 underline"
+                onClick={resetForm}
               >
-                Sil
+                İptal
               </button>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Ürün Ekleme Formu */}
-      <div className="mt-12 p-6 bg-white shadow rounded max-w-md">
-        <h2 className="text-xl font-bold mb-4">➕ Yeni Ürün Ekle</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            placeholder="Ürün Adı"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <input
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="Açıklama"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            name="image_url"
-            value={form.image_url}
-            onChange={handleChange}
-            placeholder="Görsel URL"
-            className="w-full p-2 border rounded"
-          />
-          <input
-            name="price"
-            value={form.price}
-            onChange={handleChange}
-            placeholder="Fiyat"
-            type="number"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <select
-            name="category_id"
-            value={form.category_id}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="">Kategori Seç</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
-          >
-            {editProduct ? "Güncelle" : "Ekle"}
-          </button>
-        </form>
-      </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
