@@ -14,6 +14,20 @@ const AdminOrders = () => {
     fetchOrders()
   }, [])
 
+  const handleDelete = async (id) => {
+    const confirm = window.confirm("Bu siparişi silmek istediğinizden emin misiniz?")
+    if (!confirm) return
+
+    try {
+      await api.delete(`/orders/${id}`)
+      setOrders((prev) => prev.filter((order) => order.id !== id))
+      alert("Sipariş silindi.")
+    } catch (err) {
+      console.error("Silme hatası:", err)
+      alert("Sipariş silinemedi.")
+    }
+  }
+
   // filtrelenmiş siparişler
   const filteredOrders = orders
     .filter(order =>
@@ -64,7 +78,15 @@ const AdminOrders = () => {
               <p className="text-sm text-gray-600">🪑 Masa: {order.table_number}</p>
               <p className="text-sm text-gray-500">🕒 {new Date(order.created_at).toLocaleString()}</p>
             </div>
-            <div className="text-lg font-bold text-green-700">{order.total_price} ₺</div>
+            <div className="flex items-center">
+              <div className="text-lg font-bold text-green-700 mr-4">{order.total_price} ₺</div>
+              <button
+                className="text-red-500 text-sm hover:underline"
+                onClick={() => handleDelete(order.id)}
+              >
+                Sil
+              </button>
+            </div>
           </div>
 
           {order.items?.length > 0 && (
