@@ -46,29 +46,22 @@ const AdminOrders = () => {
   }
 
   // filtrelenmiş siparişler
-  const filteredOrders = orders
-    .filter(order =>
-      order.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .filter(order =>
-      selectedDate
-        ? new Date(order.created_at).toISOString().slice(0, 10) === selectedDate
-        : true
-    )
+  const filteredOrders = orders.filter(order =>
+    order.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.table_number.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <h2 className="text-2xl font-bold mb-6">📋 Tüm Siparişler</h2>
 
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Müşteri adına göre ara..."
-          className="w-full max-w-md border px-4 py-2 rounded shadow-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      <input
+        type="text"
+        placeholder="İsim veya masa numarası ara..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full border px-3 py-2 rounded mb-4"
+      />
 
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Tarihe göre filtrele</label>
