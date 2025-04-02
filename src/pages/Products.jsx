@@ -18,31 +18,36 @@ const Products = () => {
     category_id: "",
   })
 
+  const [loading, setLoading] = useState(true)
+
   const fetchProducts = async () => {
     try {
-      const res = await api.get("/products")
-      setProducts(res.data)
+      const response = await api.get("/products")
+      setProducts(response.data)
     } catch (err) {
-      console.error("Ürünler alınamadı:", err.message)
+      console.error("Ürünler yüklenirken hata:", err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   const fetchCategories = async () => {
     try {
-      const res = await api.get("/categories")
-      setCategories(res.data)
+      const response = await api.get("/categories")
+      setCategories(response.data)
     } catch (err) {
-      console.error("Kategoriler alınamadı:", err.message)
+      console.error("Kategoriler yüklenirken hata:", err.message)
     }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm("Bu ürünü silmek istediğinize emin misiniz?")) return
+    if (!window.confirm("Bu ürünü silmek istediğinize emin misiniz?")) return
+
     try {
       await api.delete(`/products/${id}`)
       fetchProducts()
     } catch (err) {
-      console.error("Ürün silinemedi:", err.message)
+      console.error("Ürün silinirken hata:", err.message)
     }
   }
 
@@ -91,23 +96,38 @@ const Products = () => {
     setFormOpen(true)
   }
 
+  const handleAdd = async (formData) => {
+    try {
+      await api.post("/products", formData)
+      fetchProducts()
+    } catch (err) {
+      console.error("Ürün eklenirken hata oluştu:", err.message)
+    }
+  }
+
   useEffect(() => {
     fetchProducts()
     fetchCategories()
   }, [])
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Yükleniyor...</div>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-4 space-y-8">
-      <h1 className="text-2xl font-bold">📦 Ürün Yönetimi</h1>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">�� Ürün Yönetimi</h1>
 
       <ProductTable
         products={products}
+        categories={categories}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        onAdd={() => {
-          resetForm()
-          setFormOpen(true)
-        }}
+        onAdd={handleAdd}
       />
 
       {formOpen && (
