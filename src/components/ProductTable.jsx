@@ -17,7 +17,7 @@ const categoryColors = {
   "Salatalar": "bg-emerald-100 text-emerald-800",
 }
 
-const ProductTable = ({ products, onEdit, onDelete, onAdd, categories }) => {
+const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd }) => {
   const [searchTerm, setSearchTerm] = useState("")
   const [page, setPage] = useState(0)
   const [showModal, setShowModal] = useState(false)
@@ -270,7 +270,7 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd, categories }) => {
                 required
               >
                 <option value="">Kategori Seç</option>
-                {categories.map((cat) => (
+                {Array.isArray(categories) && categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
                   </option>
