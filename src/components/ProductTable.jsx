@@ -3,7 +3,7 @@ import { useReactToPrint } from "react-to-print"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
 
-const ProductTable = ({ products, onEdit, onDelete }) => {
+const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
   const [searchTerm, setSearchTerm] = useState("")
   const printRef = useRef()
 
@@ -59,55 +59,71 @@ const ProductTable = ({ products, onEdit, onDelete }) => {
             >
               Yazdır
             </button>
+            <button
+              onClick={onAdd}
+              className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
+            >
+              + Yeni Ürün
+            </button>
           </div>
         </div>
       </div>
 
-      <div ref={printRef} className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="p-3 text-left">Ürün</th>
-              <th className="p-3 text-left">Kategori</th>
-              <th className="p-3 text-left">Fiyat</th>
-              <th className="p-3 text-left">Stok</th>
-              <th className="p-3 text-left">Açıklama</th>
-              <th className="p-3 text-right">İşlemler</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map((product) => (
-              <tr key={product.id} className="border-t hover:bg-gray-50">
-                <td className="p-3">{product.name}</td>
-                <td className="p-3">{product.category_name}</td>
-                <td className="p-3">{product.price} ₺</td>
-                <td className="p-3">{product.stock}</td>
-                <td className="p-3 max-w-xs truncate">{product.description}</td>
-                <td className="p-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => onEdit(product)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </td>
+      {filteredProducts.length === 0 ? (
+        <div className="p-6 text-center text-gray-500">Hiç ürün bulunamadı.</div>
+      ) : (
+        <div ref={printRef} className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-3 text-left">Ürün</th>
+                <th className="p-3 text-left">Kategori</th>
+                <th className="p-3 text-right">Fiyat</th>
+                <th className="p-3 text-right">Stok</th>
+                <th className="p-3 text-left hidden md:table-cell">Açıklama</th>
+                <th className="p-3 text-right">İşlemler</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredProducts.length === 0 && (
-        <div className="p-4 text-center text-gray-500">
-          Ürün bulunamadı.
+            </thead>
+            <tbody>
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
+                    {product.name}
+                  </td>
+                  <td className="p-3">
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
+                      {product.category_name}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    {product.price} ₺
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    {product.stock}
+                  </td>
+                  <td className="p-3 hidden md:table-cell max-w-xs truncate">
+                    {product.description}
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => onEdit(product)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => onDelete(product.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
