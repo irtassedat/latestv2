@@ -13,9 +13,13 @@ const QrMenu = () => {
   const navigate = useNavigate()
 
   const fetchProducts = async () => {
-    const res = await api.get(`/branches/${selectedBranchId}/products`)
-    const visibleProducts = res.data.filter((p) => p.is_visible)
-    setProducts(visibleProducts)
+    try {
+      const res = await api.get(`/branches/${selectedBranchId}/products`)
+      console.log("API'den gelen ürünler:", res.data) // 🔍 Debug log 1
+      setProducts(res.data) // Test için filtreleme olmadan direkt veriyi göster
+    } catch (err) {
+      console.error("Ürünler yüklenirken hata:", err.message)
+    }
   }
 
   useEffect(() => {
