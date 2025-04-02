@@ -2,16 +2,32 @@ import { useState, useRef } from "react"
 import { useReactToPrint } from "react-to-print"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
+import ReactPaginate from "react-paginate"
+
+const categoryColors = {
+  "Tatlılar": "bg-pink-100 text-pink-800",
+  "Kahveler": "bg-amber-100 text-amber-800",
+  "Soğuk İçecekler": "bg-blue-100 text-blue-800",
+  "Sıcak İçecekler": "bg-orange-100 text-orange-800",
+  "Ana Yemekler": "bg-green-100 text-green-800",
+  "Başlangıçlar": "bg-purple-100 text-purple-800",
+  "Tatlılar": "bg-pink-100 text-pink-800",
+  "İçecekler": "bg-cyan-100 text-cyan-800",
+  "Atıştırmalıklar": "bg-yellow-100 text-yellow-800",
+  "Salatalar": "bg-emerald-100 text-emerald-800",
+}
 
 const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
   const [searchTerm, setSearchTerm] = useState("")
+  const [page, setPage] = useState(0)
   const printRef = useRef()
+  const itemsPerPage = 10
 
   const handleExportExcel = () => {
     const exportData = products.map((product) => ({
       Ürün: product.name,
       Kategori: product.category_name,
-      Fiyat: `${product.price} ₺`,
+      Fiyat: product.price,
       Stok: product.stock,
       Açıklama: product.description,
     }))
@@ -33,6 +49,11 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.category_name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const paginatedProducts = filteredProducts.slice(
+    page * itemsPerPage,
+    (page + 1) * itemsPerPage
   )
 
   return (
@@ -76,6 +97,7 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50">
+                <th className="p-3 text-left">Görsel</th>
                 <th className="p-3 text-left">Ürün</th>
                 <th className="p-3 text-left">Kategori</th>
                 <th className="p-3 text-right">Fiyat</th>
@@ -85,13 +107,25 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => (
+              {paginatedProducts.map((product) => (
                 <tr key={product.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3">
+                    <img
+                      src={product.image_url || "https://placehold.co/40"}
+                      alt={product.name}
+                      className="w-10 h-10 object-cover rounded"
+                    />
+                  </td>
                   <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
                     {product.name}
                   </td>
                   <td className="p-3">
-                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded ${
+                        categoryColors[product.category_name] ||
+                        "bg-gray-100 text-gray-800"
+                      }`}
+                    >
                       {product.category_name}
                     </span>
                   </td>
@@ -124,6 +158,21 @@ const ProductTable = ({ products, onEdit, onDelete, onAdd }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {filteredProducts.length > 0 && (
+        <div className="p-4 border-t">
+          <ReactPaginate
+            pageCount={Math.ceil(filteredProducts.length / itemsPerPage)}
+            onPageChange={(e) => setPage(e.selected)}
+            containerClassName="flex justify-center gap-2"
+            activeClassName="font-bold text-blue-600"
+            previousClassName="px-3 py-1 rounded hover:bg-gray-100"
+            nextClassName="px-3 py-1 rounded hover:bg-gray-100"
+            pageClassName="px-3 py-1 rounded hover:bg-gray-100"
+            breakClassName="px-3 py-1"
+          />
         </div>
       )}
     </div>
