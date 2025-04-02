@@ -3,7 +3,7 @@ import { useReactToPrint } from "react-to-print"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
 import ReactPaginate from "react-paginate"
-import api from "../lib/api"
+import api from "../lib/axios";
 
 const categoryColors = {
   "Tatlılar": "bg-pink-100 text-pink-800",
@@ -101,8 +101,8 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
 
     // Veriyi backend'e POST et
     try {
-      const res = await api.post("/products/bulk", { products: json })
-      alert(`✅ ${res.data.insertedCount} ürün eklendi`)
+      const res = await api.post("/products/bulk", json)
+      alert(`✅ ${res.data.insertedProducts.length} ürün başarıyla eklendi!`)
       window.location.reload()
     } catch (err) {
       console.error("Excel import hatası:", err.message)
@@ -153,7 +153,13 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
               Excel'e Aktar
             </button>
             <button
-              onClick={handlePrint}
+              onClick={() => {
+                if (filteredProducts.length === 0) {
+                  alert("Yazdırılacak ürün yok.")
+                } else {
+                  handlePrint()
+                }
+              }}
               className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800 text-sm"
             >
               Yazdır
@@ -168,76 +174,78 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
         </div>
       </div>
 
-      {filteredProducts.length === 0 ? (
-        <div className="p-6 text-center text-gray-500">Hiç ürün bulunamadı.</div>
-      ) : (
-        <div ref={printRef} className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-3 text-left">Görsel</th>
-                <th className="p-3 text-left">Ürün</th>
-                <th className="p-3 text-left">Kategori</th>
-                <th className="p-3 text-right">Fiyat</th>
-                <th className="p-3 text-right">Stok</th>
-                <th className="p-3 text-left hidden md:table-cell">Açıklama</th>
-                <th className="p-3 text-right">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedProducts.map((product) => (
-                <tr key={product.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3">
-                    <img
-                      src={product.image_url || "https://placehold.co/40"}
-                      alt={product.name}
-                      className="w-10 h-10 object-cover rounded"
-                    />
-                  </td>
-                  <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
-                    {product.name}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`text-xs font-medium px-2 py-1 rounded ${
-                        categoryColors[product.category_name || ""] ||
-                        "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {product.category_name || "Kategori Yok"}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    {product.price} ₺
-                  </td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    {product.stock}
-                  </td>
-                  <td className="p-3 hidden md:table-cell max-w-xs truncate">
-                    {product.description}
-                  </td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleEditClick(product)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => onDelete(product.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
+      <div ref={printRef}>
+        {filteredProducts.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">Hiç ürün bulunamadı.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-3 text-left">Görsel</th>
+                  <th className="p-3 text-left">Ürün</th>
+                  <th className="p-3 text-left">Kategori</th>
+                  <th className="p-3 text-right">Fiyat</th>
+                  <th className="p-3 text-right">Stok</th>
+                  <th className="p-3 text-left hidden md:table-cell">Açıklama</th>
+                  <th className="p-3 text-right">İşlemler</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {paginatedProducts.map((product) => (
+                  <tr key={product.id} className="border-t hover:bg-gray-50">
+                    <td className="p-3">
+                      <img
+                        src={product.image_url || "https://placehold.co/40"}
+                        alt={product.name}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                    </td>
+                    <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
+                      {product.name}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded ${
+                          categoryColors[product.category_name || ""] ||
+                          "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {product.category_name || "Kategori Yok"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap">
+                      {product.price} ₺
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap">
+                      {product.stock}
+                    </td>
+                    <td className="p-3 hidden md:table-cell max-w-xs truncate">
+                      {product.description}
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleEditClick(product)}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => onDelete(product.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {filteredProducts.length > 0 && (
         <div className="overflow-x-auto px-4 pb-4">
