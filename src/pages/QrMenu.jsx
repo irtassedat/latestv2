@@ -11,17 +11,22 @@ const QrMenu = () => {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showFilterModal, setShowFilterModal] = useState(false)
   const containerRef = useRef(null)
   const navigate = useNavigate()
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [minPrice, setMinPrice] = useState("")
+  const [maxPrice, setMaxPrice] = useState("")
+  const [onlyInStock, setOnlyInStock] = useState(false)
 
   // Modal açıldığında body scroll'u engelle
   useEffect(() => {
-    if (isCartOpen) {
+    if (isCartOpen || showFilterModal) {
       document.body.classList.add("overflow-hidden")
     } else {
       document.body.classList.remove("overflow-hidden")
     }
-  }, [isCartOpen])
+  }, [isCartOpen, showFilterModal])
 
   const fetchProducts = async () => {
     try {
@@ -37,11 +42,17 @@ const QrMenu = () => {
     fetchProducts()
   }, [selectedBranchId])
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.category_name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+
+    const matchesCategory = selectedCategory === "" || p.category_name === selectedCategory
+    const matchesMin = minPrice === "" || p.price >= parseFloat(minPrice)
+    const matchesMax = maxPrice === "" || p.price <= parseFloat(maxPrice)
+    const matchesStock = !onlyInStock || p.stock_count > 0
+
+    return matchesSearch && matchesCategory && matchesMin && matchesMax && matchesStock
+  })
 
   const grouped = filteredProducts.reduce((acc, curr) => {
     if (!acc[curr.category_name]) acc[curr.category_name] = []
@@ -109,18 +120,67 @@ const QrMenu = () => {
       .replace(/\s+/g, "-")
     
 
+  // Önerilen ürünleri filtrele
+  const recommendedProducts = products.filter((p) =>
+    ["Çeşme Kumru", "Beyaz Peynirli Omlet"].includes(p.name)
+  )
+
   return (
     <div className="min-h-screen bg-gray-100 p-4" ref={containerRef}>
-      <h1 className="text-center text-2xl font-bold mb-6">📱 QR Menü</h1>
+      {/* Sabitlenen Başlık ve Sepet Butonu */}
+      <div className="sticky top-0 z-50 bg-white shadow-md flex justify-between items-center p-4">
+        <h1 className="text-2xl font-bold">📱 QR Menü</h1>
+        <button
+          onClick={() => setIsCartOpen(true)}
+          className="relative p-2 bg-green-600 text-white rounded-full"
+        >
+          🛒
+          {cart.length > 0 && (
+            <span className="absolute top-0 right-0 bg-red-500 text-xs rounded-full px-1">
+              {cart.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* Promosyon Slider Görseli */}
-      <div className="mb-8">
+      <div className="relative w-full h-48 md:h-64 rounded-2xl overflow-hidden shadow-lg mb-8">
         <img
           src="/uploads/dere-otlu-pogaca-slider.png"
           alt="Promosyon"
-          className="w-full h-48 md:h-64 rounded-2xl object-cover shadow-lg"
+          className="w-full h-full object-cover"
         />
       </div>
+
+      {/* Önerilen Ürünler */}
+      {recommendedProducts.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-3">⭐ Bugünün Önerileri</h2>
+          <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+            {recommendedProducts.map((p) => (
+              <div key={p.id} className="min-w-[200px] bg-white rounded-lg shadow p-3 flex gap-3 items-center">
+                <div className="w-20 h-20 rounded overflow-hidden">
+                  <img
+                    src={p.image_url || "/uploads/guncellenecek.jpg"}
+                    alt={p.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold">{p.name}</h3>
+                  <p className="text-orange-600 font-bold text-sm">{p.price} ₺</p>
+                  <button
+                    onClick={() => addToCart(p)}
+                    className="mt-1 text-green-700 border border-green-600 px-2 py-0.5 rounded-md text-xs hover:bg-green-100"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Arama ve Filtreleme */}
       <div className="flex items-center gap-2 mb-6">
@@ -136,7 +196,7 @@ const QrMenu = () => {
         </div>
         <button
           className="p-2 bg-white rounded-lg shadow hover:bg-gray-100"
-          onClick={() => alert('Filtreleme fonksiyonu eklenecek')}
+          onClick={() => setShowFilterModal(true)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -191,7 +251,8 @@ const QrMenu = () => {
               {items.map((p) => (
                 <div
                   key={p.id}
-                  className="w-full flex bg-white rounded-xl shadow-sm p-3 items-center gap-3 hover:shadow-md transition"
+                  className="w-full flex bg-white rounded-xl shadow-sm p-3 items-center gap-3 hover:shadow-md transition cursor-pointer"
+                  onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
                 >
                   {/* Görsel */}
                   <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md">
@@ -218,7 +279,10 @@ const QrMenu = () => {
                       <span className="text-orange-600 font-bold">{p.price} ₺</span>
                       <button
                         className="text-green-700 border border-green-600 px-2 py-0.5 rounded-md text-sm hover:bg-green-100"
-                        onClick={() => addToCart(p)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          addToCart(p)
+                        }}
                       >
                         +
                       </button>
@@ -234,14 +298,79 @@ const QrMenu = () => {
         ))}
       </div>
 
-      {/* Sepet Özeti */}
-      {cart.length > 0 && (
-        <div
-          className="fixed bottom-4 right-4 bg-white shadow-lg rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium cursor-pointer hover:bg-gray-100 transition"
-          onClick={() => setIsCartOpen(true)}
-        >
-          🛒 {cart.reduce((sum, item) => sum + item.quantity, 0)} ürün – 
-          {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} ₺
+      {/* Filtre Modalı */}
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-center px-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm relative shadow-lg">
+            <button
+              onClick={() => setShowFilterModal(false)}
+              className="absolute top-2 right-2 text-gray-600 hover:text-black"
+            >
+              ❌
+            </button>
+            <h3 className="text-lg font-bold mb-4">🔍 Filtrele</h3>
+
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Ürün adı"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border p-2 rounded"
+              />
+
+              {/* Stokta olanları göster */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="inStock"
+                  checked={onlyInStock}
+                  onChange={(e) => setOnlyInStock(e.target.checked)}
+                  className="accent-green-600"
+                />
+                <label htmlFor="inStock" className="text-sm text-gray-700">
+                  Sadece stokta olanlar
+                </label>
+              </div>
+
+              {/* Fiyat aralığı filtrelemesi */}
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Min fiyat"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="w-full border p-2 rounded"
+                />
+                <input
+                  type="number"
+                  placeholder="Max fiyat"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-full border p-2 rounded"
+                />
+              </div>
+
+              {/* Kategori bazlı filtreleme */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full border p-2 rounded"
+              >
+                <option value="">Kategori seç</option>
+                {Object.keys(groupedWithTeaFirst).map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="w-full bg-green-600 text-white py-2 rounded"
+              >
+                Uygula
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -260,20 +389,29 @@ const QrMenu = () => {
                 <div className="flex items-center gap-2">
                   <button
                     className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => updateQuantity(item.id, -1)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      updateQuantity(item.id, -1)
+                    }}
                   >
                     -
                   </button>
                   <span>{item.quantity}</span>
                   <button
                     className="px-2 py-1 bg-gray-200 rounded"
-                    onClick={() => updateQuantity(item.id, 1)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      updateQuantity(item.id, 1)
+                    }}
                   >
                     +
                   </button>
                   <button
                     className="text-red-600 ml-2"
-                    onClick={() => removeFromCart(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeFromCart(item.id)
+                    }}
                   >
                     ❌
                   </button>
