@@ -9,6 +9,7 @@ const QrMenu = () => {
   const [activeCategory, setActiveCategory] = useState(null)
   const [cart, setCart] = useState([])
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [showPromo, setShowPromo] = useState(false)
   const containerRef = useRef(null)
   const navigate = useNavigate()
 
@@ -25,6 +26,14 @@ const QrMenu = () => {
   useEffect(() => {
     fetchProducts()
   }, [selectedBranchId])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowPromo(true)
+    }, 4000) // 4 saniye sonra açılır
+
+    return () => clearTimeout(timer)
+  }, [])
 
   const grouped = products.reduce((acc, curr) => {
     if (!acc[curr.category_name]) acc[curr.category_name] = []
@@ -246,6 +255,28 @@ const QrMenu = () => {
                 Kapat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promosyon Modalı */}
+      {showPromo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-xl shadow-lg max-w-md w-[90%] p-4">
+            <button
+              onClick={() => setShowPromo(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              ❌
+            </button>
+            <img
+              src="/uploads/dere-otlu-pogaca-slider.png"
+              alt="Promosyon"
+              className="w-full rounded-lg object-cover"
+            />
+            <p className="mt-3 text-center font-semibold text-lg">
+              🧁 Dereotlu Poğaça + Demleme Çay: <span className="text-green-600 font-bold">75 TL</span>
+            </p>
           </div>
         </div>
       )}
