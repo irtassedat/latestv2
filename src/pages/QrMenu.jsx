@@ -9,11 +9,19 @@ const QrMenu = () => {
   const [activeCategory, setActiveCategory] = useState(null)
   const [cart, setCart] = useState([])
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const [showPromo, setShowPromo] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const containerRef = useRef(null)
   const navigate = useNavigate()
+
+  // Modal açıldığında body scroll'u engelle
+  useEffect(() => {
+    if (isCartOpen) {
+      document.body.classList.add("overflow-hidden")
+    } else {
+      document.body.classList.remove("overflow-hidden")
+    }
+  }, [isCartOpen])
 
   const fetchProducts = async () => {
     try {
@@ -28,14 +36,6 @@ const QrMenu = () => {
   useEffect(() => {
     fetchProducts()
   }, [selectedBranchId])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowPromo(true)
-    }, 4000) // 4 saniye sonra açılır
-
-    return () => clearTimeout(timer)
-  }, [])
 
   const filteredProducts = products.filter(
     (p) =>
@@ -113,7 +113,16 @@ const QrMenu = () => {
     <div className="min-h-screen bg-gray-100 p-4" ref={containerRef}>
       <h1 className="text-center text-2xl font-bold mb-6">📱 QR Menü</h1>
 
-      {/* Arama Alanı */}
+      {/* Promosyon Slider Görseli */}
+      <div className="mb-4">
+        <img
+          src="/uploads/dere-otlu-pogaca-slider.png"
+          alt="Promosyon"
+          className="w-full rounded-xl shadow object-cover"
+        />
+      </div>
+
+      {/* Arama ve Filtreleme */}
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => setShowSearch((prev) => !prev)}
@@ -231,8 +240,8 @@ const QrMenu = () => {
 
       {/* Sepet Modalı */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center">
-          <div className="bg-white w-[90%] max-w-md rounded-xl shadow-lg p-6 relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-4 relative">
             <h3 className="text-xl font-bold mb-4">🛒 Sepet</h3>
             
             {cart.map((item) => (
@@ -283,29 +292,6 @@ const QrMenu = () => {
                 Kapat
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Promosyon Modalı */}
-      {showPromo && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex justify-center items-center">
-          <div className="relative bg-white rounded-xl shadow-lg max-w-md w-[90%] p-4 max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setShowPromo(false)}
-              className="absolute top-2 right-2 text-black hover:text-gray-800 text-xl"
-            >
-              ✖️
-            </button>
-            <img
-              src="/uploads/dere-otlu-pogaca-slider.png"
-              alt="Promosyon"
-              className="w-full rounded-lg object-cover"
-            />
-            <p className="mt-3 text-center font-semibold text-lg">
-              🧁 Dereotlu Poğaça + Demleme Çay:{" "}
-              <span className="text-orange-500 font-bold">75 TL</span>
-            </p>
           </div>
         </div>
       )}
