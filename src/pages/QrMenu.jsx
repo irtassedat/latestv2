@@ -10,6 +10,8 @@ const QrMenu = () => {
   const [cart, setCart] = useState([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [showPromo, setShowPromo] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
   const containerRef = useRef(null)
   const navigate = useNavigate()
 
@@ -35,7 +37,13 @@ const QrMenu = () => {
     return () => clearTimeout(timer)
   }, [])
 
-  const grouped = products.reduce((acc, curr) => {
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.category_name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const grouped = filteredProducts.reduce((acc, curr) => {
     if (!acc[curr.category_name]) acc[curr.category_name] = []
     acc[curr.category_name].push(curr)
     return acc
@@ -104,6 +112,26 @@ const QrMenu = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4" ref={containerRef}>
       <h1 className="text-center text-2xl font-bold mb-6">📱 QR Menü</h1>
+
+      {/* Arama Alanı */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => setShowSearch((prev) => !prev)}
+          className="p-2 bg-white rounded-full shadow hover:bg-gray-200"
+        >
+          🔍
+        </button>
+
+        {showSearch && (
+          <input
+            type="text"
+            placeholder="Ürün ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-3 py-2 border rounded"
+          />
+        )}
+      </div>
 
       {/* Kategori Butonları */}
       <div className="flex overflow-x-auto space-x-3 pb-4 mb-6 scrollbar-hide snap-x snap-mandatory">
@@ -261,13 +289,13 @@ const QrMenu = () => {
 
       {/* Promosyon Modalı */}
       {showPromo && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center">
-          <div className="relative bg-white rounded-xl shadow-lg max-w-md w-[90%] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex justify-center items-center">
+          <div className="relative bg-white rounded-xl shadow-lg max-w-md w-[90%] p-4 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowPromo(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+              className="absolute top-2 right-2 text-black hover:text-gray-800 text-xl"
             >
-              ❌
+              ✖️
             </button>
             <img
               src="/uploads/dere-otlu-pogaca-slider.png"
@@ -275,7 +303,8 @@ const QrMenu = () => {
               className="w-full rounded-lg object-cover"
             />
             <p className="mt-3 text-center font-semibold text-lg">
-              🧁 Dereotlu Poğaça + Demleme Çay: <span className="text-green-600 font-bold">75 TL</span>
+              🧁 Dereotlu Poğaça + Demleme Çay:{" "}
+              <span className="text-orange-500 font-bold">75 TL</span>
             </p>
           </div>
         </div>
