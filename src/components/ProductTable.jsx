@@ -53,6 +53,7 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
+    documentTitle: "Ürün Listesi",
   })
 
   const handleChange = (e) => {
@@ -174,78 +175,82 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
         </div>
       </div>
 
-      <div ref={printRef}>
-        {filteredProducts.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">Hiç ürün bulunamadı.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-3 text-left">Görsel</th>
-                  <th className="p-3 text-left">Ürün</th>
-                  <th className="p-3 text-left">Kategori</th>
-                  <th className="p-3 text-right">Fiyat</th>
-                  <th className="p-3 text-right">Stok</th>
-                  <th className="p-3 text-left hidden md:table-cell">Açıklama</th>
-                  <th className="p-3 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedProducts.map((product) => (
-                  <tr key={product.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3">
-                      <img
-                        src={product.image_url || "https://placehold.co/40"}
-                        alt={product.name}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                    </td>
-                    <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
-                      {product.name}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`text-xs font-medium px-2 py-1 rounded ${
-                          categoryColors[product.category_name || ""] ||
-                          "bg-gray-100 text-gray-800"
-                        }`}
+      {filteredProducts.length === 0 ? (
+        <div className="p-6 text-center text-gray-500">Hiç ürün bulunamadı.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-3 text-left">Görsel</th>
+                <th className="p-3 text-left">Ürün</th>
+                <th className="p-3 text-left">Kategori</th>
+                <th className="p-3 text-right">Fiyat</th>
+                <th className="p-3 text-right">Stok</th>
+                <th className="p-3 text-left hidden md:table-cell">Açıklama</th>
+                <th className="p-3 text-right">İşlemler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedProducts.map((product) => (
+                <tr key={product.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3">
+                    <img
+                      src={
+                        product.image_url &&
+                        product.image_url.trim() !== "" &&
+                        !product.image_url.includes("ibb.co")
+                          ? product.image_url
+                          : "/uploads/guncellenecek.jpg"
+                      }
+                      alt={product.name}
+                      className="w-10 h-10 object-cover rounded"
+                    />
+                  </td>
+                  <td className="p-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]">
+                    {product.name}
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded ${
+                        categoryColors[product.category_name || ""] ||
+                        "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {product.category_name || "Kategori Yok"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    {product.price} ₺
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    {product.stock}
+                  </td>
+                  <td className="p-3 hidden md:table-cell max-w-xs truncate">
+                    {product.description}
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => handleEditClick(product)}
+                        className="text-blue-600 hover:text-blue-800"
                       >
-                        {product.category_name || "Kategori Yok"}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right whitespace-nowrap">
-                      {product.price} ₺
-                    </td>
-                    <td className="p-3 text-right whitespace-nowrap">
-                      {product.stock}
-                    </td>
-                    <td className="p-3 hidden md:table-cell max-w-xs truncate">
-                      {product.description}
-                    </td>
-                    <td className="p-3 text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleEditClick(product)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => onDelete(product.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => onDelete(product.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {filteredProducts.length > 0 && (
         <div className="overflow-x-auto px-4 pb-4">
@@ -331,8 +336,8 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
 
       {/* Yazdırılacak tüm ürünlerin bulunduğu görünmeyen tablo */}
       <div style={{ display: "none" }}>
-        <div ref={printRef}>
-          <h2 className="text-xl font-bold mb-4">Tüm Ürünler (Yazdır)</h2>
+        <div ref={printRef} className="p-4">
+          <h2 className="text-xl font-bold mb-4 text-center">Ürün Listesi</h2>
           <table className="w-full text-sm border border-gray-300">
             <thead>
               <tr className="bg-gray-100">
@@ -344,7 +349,7 @@ const ProductTable = ({ products = [], categories = [], onEdit, onDelete, onAdd 
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((p) => (
+              {products.map((p) => (
                 <tr key={p.id}>
                   <td className="p-2 border">{p.name}</td>
                   <td className="p-2 border">{p.category_name}</td>

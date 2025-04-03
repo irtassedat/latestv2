@@ -143,9 +143,14 @@ const QrMenu = () => {
                   {/* Görsel */}
                   <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md">
                     <img
-                      src={p.image_url || `/category/${toSlug(p.category_name)}.jpg`}
+                      src={
+                        p.image_url &&
+                        p.image_url.trim() !== "" &&
+                        !p.image_url.includes("ibb.co")
+                          ? p.image_url
+                          : "/uploads/guncellenecek.jpg"
+                      }
                       alt={p.name}
-                      onError={(e) => (e.target.src = "/category/default.jpg")}
                       className="w-full h-full object-cover"
                     />
                   </div>
