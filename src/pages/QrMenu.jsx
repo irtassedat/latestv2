@@ -114,36 +114,43 @@ const QrMenu = () => {
       <h1 className="text-center text-2xl font-bold mb-6">📱 QR Menü</h1>
 
       {/* Promosyon Slider Görseli */}
-      <div className="mb-4">
+      <div className="mb-8">
         <img
           src="/uploads/dere-otlu-pogaca-slider.png"
           alt="Promosyon"
-          className="w-full rounded-xl shadow object-cover"
+          className="w-full h-48 md:h-64 rounded-2xl object-cover shadow-lg"
         />
       </div>
 
       {/* Arama ve Filtreleme */}
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={() => setShowSearch((prev) => !prev)}
-          className="p-2 bg-white rounded-full shadow hover:bg-gray-200"
-        >
-          🔍
-        </button>
-
-        {showSearch && (
+      <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 bg-white shadow px-3 py-2 rounded w-full">
+          <span className="text-gray-500 text-lg">🔍</span>
           <input
             type="text"
             placeholder="Ürün ara..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border rounded"
+            className="flex-1 outline-none"
           />
-        )}
+        </div>
+        <button
+          className="p-2 bg-white rounded-lg shadow hover:bg-gray-100"
+          onClick={() => alert('Filtreleme fonksiyonu eklenecek')}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 text-gray-600"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M3 5a1 1 0 011-1h12a1 1 0 01.8 1.6l-4.2 5.6V15a1 1 0 01-.3.7l-2 2A1 1 0 019 18v-6.8L4.2 6.6A1 1 0 013 5z" />
+          </svg>
+        </button>
       </div>
 
       {/* Kategori Butonları */}
-      <div className="flex overflow-x-auto space-x-3 pb-4 mb-6 scrollbar-hide snap-x snap-mandatory">
+      <div className="flex overflow-x-auto space-x-3 pb-6 mb-10 scrollbar-hide snap-x snap-mandatory">
         {Object.keys(groupedWithTeaFirst).map((cat) => (
           <button
             key={cat}
