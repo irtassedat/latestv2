@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../lib/axios"
+import toast from "react-hot-toast"
 
 const QrMenu = () => {
   const [branches, setBranches] = useState([])
@@ -78,18 +79,23 @@ const QrMenu = () => {
   }
 
   const addToCart = (product) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id)
-      if (existing) {
-        return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      } else {
-        return [...prev, { ...product, quantity: 1 }]
-      }
-    })
+    const storedCart = JSON.parse(localStorage.getItem("qr_cart") || "[]")
+    const existingItem = storedCart.find((item) => item.id === product.id)
+
+    let updatedCart
+    if (existingItem) {
+      updatedCart = storedCart.map((item) =>
+        item.id === product.id
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    } else {
+      updatedCart = [...storedCart, { ...product, quantity: 1 }]
+    }
+
+    localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
+    setCart(updatedCart)
+    toast.success("Ürün sepete eklendi!")
   }
 
   const updateQuantity = (productId, delta) => {
@@ -125,6 +131,19 @@ const QrMenu = () => {
     ["Çeşme Kumru", "Beyaz Peynirli Omlet"].includes(p.name)
   )
 
+  useEffect(() => {
+    const syncCart = () => {
+      const stored = JSON.parse(localStorage.getItem("qr_cart") || "[]")
+      setCart(stored)
+    }
+
+    // Sync cart when the window gains focus
+    window.addEventListener("focus", syncCart)
+    syncCart()
+
+    return () => window.removeEventListener("focus", syncCart)
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-100 p-4" ref={containerRef}>
       {/* Sabitlenen Başlık ve Sepet Butonu */}
@@ -132,11 +151,12 @@ const QrMenu = () => {
         <h1 className="text-2xl font-bold">📱 QR Menü</h1>
         <button
           onClick={() => setIsCartOpen(true)}
-          className="relative p-2 bg-green-600 text-white rounded-full"
+          className="relative flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-full shadow hover:bg-gray-50 transition"
         >
           🛒
+          <span className="text-sm font-semibold text-gray-800">Sepetim</span>
           {cart.length > 0 && (
-            <span className="absolute top-0 right-0 bg-red-500 text-xs rounded-full px-1">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">
               {cart.length}
             </span>
           )}
@@ -158,7 +178,11 @@ const QrMenu = () => {
           <h2 className="text-xl font-semibold mb-3">⭐ Bugünün Önerileri</h2>
           <div className="flex gap-4 overflow-x-auto scrollbar-hide">
             {recommendedProducts.map((p) => (
-              <div key={p.id} className="min-w-[200px] bg-white rounded-lg shadow p-3 flex gap-3 items-center">
+              <div
+                key={p.id}
+                onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
+                className="cursor-pointer min-w-[200px] bg-white rounded-lg shadow p-3 flex gap-3 items-center"
+              >
                 <div className="w-20 h-20 rounded overflow-hidden">
                   <img
                     src={p.image_url || "/uploads/guncellenecek.jpg"}
@@ -169,12 +193,6 @@ const QrMenu = () => {
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold">{p.name}</h3>
                   <p className="text-orange-600 font-bold text-sm">{p.price} ₺</p>
-                  <button
-                    onClick={() => addToCart(p)}
-                    className="mt-1 text-green-700 border border-green-600 px-2 py-0.5 rounded-md text-xs hover:bg-green-100"
-                  >
-                    +
-                  </button>
                 </div>
               </div>
             ))}
@@ -251,8 +269,8 @@ const QrMenu = () => {
               {items.map((p) => (
                 <div
                   key={p.id}
-                  className="w-full flex bg-white rounded-xl shadow-sm p-3 items-center gap-3 hover:shadow-md transition cursor-pointer"
                   onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
+                  className="w-full flex bg-white rounded-xl shadow-sm p-3 items-center gap-3 hover:shadow-md transition cursor-pointer"
                 >
                   {/* Görsel */}
                   <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md">
@@ -275,18 +293,6 @@ const QrMenu = () => {
                     {p.description && (
                       <p className="text-sm text-gray-600 line-clamp-2">{p.description}</p>
                     )}
-                    <div className="flex justify-between items-center mt-1">
-                      <span className="text-orange-600 font-bold">{p.price} ₺</span>
-                      <button
-                        className="text-green-700 border border-green-600 px-2 py-0.5 rounded-md text-sm hover:bg-green-100"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          addToCart(p)
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
                     {p.stock_count !== null && (
                       <p className="text-xs text-gray-400 mt-1">Stok: {p.stock_count}</p>
                     )}

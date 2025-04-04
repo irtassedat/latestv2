@@ -8,10 +8,12 @@ import QrMenu from "./pages/QrMenu"
 import ConfirmOrder from "./pages/ConfirmOrder"
 import AdminOrders from "./pages/AdminOrders"
 import ProductDetail from "./pages/ProductDetail"
+import { Toaster } from "react-hot-toast"
 
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="bottom-center" toastOptions={{ duration: 2000 }} />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<MainLayout />}>
