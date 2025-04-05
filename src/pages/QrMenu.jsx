@@ -1,3 +1,4 @@
+// QrMenu.jsx
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../lib/axios"
@@ -21,6 +22,7 @@ const QrMenu = () => {
   const [onlyInStock, setOnlyInStock] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showCategoryHeader, setShowCategoryHeader] = useState(false)
+  const categoryObserverRef = useRef(null)
 
   // Promosyon slider verileri
   const promotionSlides = [
@@ -49,6 +51,61 @@ const QrMenu = () => {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // Görünen kategoriyi otomatik aktif etmek için IntersectionObserver
+  useEffect(() => {
+    // Daha önce oluşturulan observer'ı temizle
+    if (categoryObserverRef.current) {
+      categoryObserverRef.current.disconnect()
+    }
+
+    // Yeni observer oluştur
+    const options = {
+      root: null,
+      rootMargin: "-20% 0px -70% 0px", // Ekranın orta kısmında görünen kategoriler için
+      threshold: 0.1
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // Kategori ID'sinden kategori adını çıkar (section-Çaylar -> Çaylar)
+          const categoryName = entry.target.id.replace('section-', '')
+          setActiveCategory(categoryName)
+          
+          // Aktif kategori değiştiğinde yatay scroll'u güncelle
+          if (showCategoryHeader) {
+            setTimeout(() => {
+              const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
+              if (fixedCatButton) {
+                fixedCatButton.scrollIntoView({
+                  behavior: "smooth", 
+                  block: "nearest",
+                  inline: "center"
+                })
+              }
+            }, 100)
+          }
+        }
+      })
+    }, options)
+
+    // Tüm kategori bölümlerini gözlemle
+    Object.keys(groupedWithTeaFirst).forEach(category => {
+      const element = document.getElementById(`section-${category}`)
+      if (element) {
+        observer.observe(element)
+      }
+    })
+
+    categoryObserverRef.current = observer
+
+    return () => {
+      if (categoryObserverRef.current) {
+        categoryObserverRef.current.disconnect()
+      }
+    }
+  }, [products, showCategoryHeader]) // products veya showCategoryHeader değiştiğinde observer'ı yeniden oluştur
 
   // Slider otomatik geçiş
   useEffect(() => {
@@ -113,6 +170,21 @@ const QrMenu = () => {
         block: "start",
       })
       setActiveCategory(categoryName)
+      
+      // Yatay scroll ile kategori butonunu görünür yap
+      setTimeout(() => {
+        const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
+        const fixedNavContainer = document.getElementById('fixed-category-nav')
+        
+        if (fixedCatButton && fixedNavContainer && showCategoryHeader) {
+          // Butonu görünür alana getir
+          fixedCatButton.scrollIntoView({
+            behavior: "smooth", 
+            block: "nearest",
+            inline: "center"
+          })
+        }
+      }, 100)
     }
   }
 
@@ -212,48 +284,39 @@ const QrMenu = () => {
 
   return (
     <div className="min-h-screen bg-gray-100" ref={containerRef}>
-      {/* Ana Başlık */}
-      <div className="bg-white shadow-md flex justify-between items-center p-4">
-        <h1 className="text-2xl font-bold">📱 QR Menü</h1>
-        <button
-          onClick={() => setIsCartOpen(true)}
-          className="relative flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-300 rounded-full shadow hover:bg-gray-50 transition"
-        >
-          🛒
-          <span className="text-sm font-semibold text-gray-800">Sepetim</span>
-          {cart.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">
-              {cart.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
+      {/* Sabit Kategori Header (scroll edildiğinde görünür) - GÜNCELLENMIŞ */}
       {showCategoryHeader && (
-        <div className="sticky top-0 z-40 bg-white shadow-md p-2 transition-all duration-300">
-          <div className="overflow-x-auto">
-            <div className="flex space-x-4 py-1">
+        <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
+          <div className="overflow-x-auto px-0">
+            <div id="fixed-category-nav" className="flex py-1 px-2 gap-2">
               {Object.keys(groupedWithTeaFirst).map((cat) => (
                 <button
                   key={cat}
+                  id={`fixed-cat-${cat}`}
                   onClick={() => handleCategoryClick(cat)}
-                  className={`px-3 py-1 text-sm whitespace-nowrap rounded-full
+                  className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
                     ${activeCategory === cat 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      ? 'bg-white border-[#1a9c95] text-[#1a9c95]' 
+                      : 'bg-[#1a9c95] text-white border-[#1a9c95] hover:opacity-90'
                     }`}
                 >
-                  {cat}
+                  {cat.toUpperCase()}
                 </button>
               ))}
             </div>
           </div>
+          
+          {/* Aktif kategori göstergesi */}
+          {activeCategory && (
+            <div className="bg-[#f4e9c7] py-1 px-4 text-[#d49e36] border-t border-[#e3d5a8] text-sm font-medium">
+              Şu an görüntülenen: {activeCategory}
+            </div>
+          )}
         </div>
       )}
 
       {/* Sabit Sepet Butonu */}
-      {showCategoryHeader && (
+      {cart.length > 0 && (
         <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40">
           <button
             onClick={() => setIsCartOpen(true)}
@@ -269,9 +332,9 @@ const QrMenu = () => {
         </div>
       )}
 
-      <div className="px-4 py-8">
+      <div className="px-4 py-4">
         {/* Promosyon Slider */}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-lg mb-8 mt-4">
+        <div className="relative w-full rounded-2xl overflow-hidden shadow-lg mb-8">
           <div className="relative w-full h-48 md:h-52">
             {/* Slider Items */}
             <div className="relative w-full h-full">
@@ -285,7 +348,7 @@ const QrMenu = () => {
                   <img
                     src={slide.image}
                     alt={`Promosyon ${index + 1}`}
-                    className="w-full h-full object-fill"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               ))}
