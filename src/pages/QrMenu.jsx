@@ -1,4 +1,3 @@
-// QrMenu.jsx
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../lib/axios"
@@ -22,6 +21,7 @@ const QrMenu = () => {
   const [onlyInStock, setOnlyInStock] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [showCategoryHeader, setShowCategoryHeader] = useState(false)
+  const [showHeader, setShowHeader] = useState(true)
   const categoryObserverRef = useRef(null)
 
   // Promosyon slider verileri
@@ -40,6 +40,13 @@ const QrMenu = () => {
   // Scroll pozisyonunu izle
   useEffect(() => {
     const handleScroll = () => {
+      // Belli bir mesafe scroll edildiğinde header'ı gizle
+      if (window.scrollY > 50) {
+        setShowHeader(false);
+      } else {
+        setShowHeader(true);
+      }
+      
       // Kategori başlığının y-pozisyonuna göre sabit başlığı göster/gizle
       const categorySection = document.getElementById('categories-section')
       if (categorySection) {
@@ -284,7 +291,22 @@ const QrMenu = () => {
 
   return (
     <div className="min-h-screen bg-gray-100" ref={containerRef}>
-      {/* Sabit Kategori Header (scroll edildiğinde görünür) - GÜNCELLENMIŞ */}
+      {/* Çeşme Kahvecisi Header - Sadece sayfanın en üstündeyken görünür */}
+      {showHeader && (
+        <header className="sticky top-0 z-50 bg-[#1a9c95] text-white p-4 shadow-md flex justify-between items-center">
+          <h1 className="text-xl font-medium">Çeşme Kahvecisi</h1>
+          <button
+            onClick={() => navigate("/feedback")}
+            className="p-2 rounded-full hover:bg-[#1a9c95]/70"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </header>
+      )}
+      
+      {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
       {showCategoryHeader && (
         <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
           <div className="overflow-x-auto px-0">
@@ -390,7 +412,7 @@ const QrMenu = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold">{p.name}</h3>
-                    <p className="text-orange-600 font-bold text-sm">{p.price} ₺</p>
+                    <p className="text-[#1a9c95] font-bold text-sm">{p.price} ₺</p>
                   </div>
                 </div>
               ))}
@@ -436,7 +458,7 @@ const QrMenu = () => {
                 className="snap-start flex flex-col items-center cursor-pointer"
               >
                 <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${
-                  activeCategory === cat ? "ring-2 ring-blue-500" : ""
+                  activeCategory === cat ? "ring-2 ring-[#1a9c95]" : ""
                 }`}>
                   <img
                     src={`/category/${toSlug(cat)}.jpg`}
@@ -471,10 +493,35 @@ const QrMenu = () => {
                   <div
                     key={p.id}
                     onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
-                    className="w-full flex bg-white rounded-xl shadow-sm p-3 items-center gap-3 hover:shadow-md transition cursor-pointer"
+                    className="w-full bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition cursor-pointer relative"
                   >
-                    {/* Görsel */}
-                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md">
+                    {/* Ürün Detayları ve İkon Alanı */}
+                    <div className="flex-1">
+                      <h3 className="text-base font-semibold">{p.name}</h3>
+                      <p className="text-[#1a9c95] font-bold text-sm mb-2">{p.price} ₺</p>
+                      
+                      {/* Ürün özellikleri ikonları */}
+                      <div className="flex gap-2 mt-2">
+                        {p.isGlutenFree && (
+                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                            <img src="/icons/gluten-free.svg" alt="Glutensiz" className="w-4 h-4" 
+                              onError={(e) => {e.target.src = "/uploads/icon-placeholder.png"}} />
+                          </div>
+                        )}
+                        {p.isVegetarian && (
+                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                            <img src="/icons/vegetarian.svg" alt="Vejetaryen" className="w-4 h-4"
+                              onError={(e) => {e.target.src = "/uploads/icon-placeholder.png"}} />
+                          </div>
+                        )}
+                        {p.description && (
+                          <p className="text-xs text-gray-600 line-clamp-1 mt-1">{p.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Görsel ve Sepete Ekle Butonu */}
+                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md relative">
                       <img
                         src={
                           p.image_url &&
@@ -486,20 +533,17 @@ const QrMenu = () => {
                         alt={p.name}
                         className="w-full h-full object-cover"
                       />
-                    </div>
-
-                    {/* Sağ taraf */}
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <h3 className="text-base font-semibold">{p.name}</h3>
-                        <span className="font-bold text-green-600">{p.price} ₺</span>
-                      </div>
-                      {p.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2 mt-1">{p.description}</p>
-                      )}
-                      {p.stock_count !== null && (
-                        <p className="text-xs text-gray-400 mt-1">Stok: {p.stock_count}</p>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(p);
+                        }}
+                        className="absolute top-1 right-1 bg-[#1a9c95]/70 text-white rounded-full p-1 backdrop-blur-sm hover:bg-[#1a9c95] transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -651,8 +695,8 @@ const QrMenu = () => {
                       <button
                         className="text-red-500 hover:text-red-700"
                         onClick={(e) => {
-                          e.stopPropagation()
-                          removeFromCart(item.id)
+                          e.stopPropagation();
+                          removeFromCart(item.id);
                         }}
                       >
                         🗑️
@@ -663,14 +707,14 @@ const QrMenu = () => {
 
                 <div className="mt-4 flex justify-between items-center py-2 border-t border-b">
                   <span className="font-medium">Toplam</span>
-                  <span className="text-lg font-bold text-green-600">
+                  <span className="text-lg font-bold text-[#1a9c95]">
                     {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} ₺
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-2 mt-4">
                   <button
-                    className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors"
                     onClick={() => {
                       const currentCart = [...cart];
                       navigate("/confirm", { 

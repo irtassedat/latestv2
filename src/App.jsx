@@ -9,6 +9,7 @@ import ConfirmOrder from "./pages/ConfirmOrder"
 import AdminOrders from "./pages/AdminOrders"
 import ProductDetail from "./pages/ProductDetail"
 import { Toaster } from "react-hot-toast"
+import FeedbackForm from "./pages/FeedbackForm"
 
 // Kimlik doğrulama kontrolü için basit bir guard fonksiyonu
 const PrivateRoute = ({ children }) => {
@@ -16,49 +17,37 @@ const PrivateRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// QR Menü ve ilgili sayfalar için açık olan routes
-const PublicMenuRoutes = () => (
-  <Routes>
-    <Route path="/menu" element={<QrMenu />} />
-    <Route path="/product/:id" element={<ProductDetail />} />
-    <Route path="/confirm" element={<ConfirmOrder />} />
-    <Route path="*" element={<Navigate to="/menu" />} />
-  </Routes>
-);
-
-// Admin paneli için özel routes
-const AdminRoutes = () => (
-  <Routes>
-    <Route path="/login" element={<Login />} />
-    <Route
-      path="/"
-      element={
-        <PrivateRoute>
-          <MainLayout />
-        </PrivateRoute>
-      }
-    >
-      <Route index element={<Dashboard />} />
-      <Route path="products" element={<Products />} />
-      <Route path="branch-products" element={<BranchProducts />} />
-      <Route path="admin/orders" element={<AdminOrders />} />
-      <Route path="admin/branches/:id/products" element={<BranchProducts />} />
-      <Route path="menu" element={<QrMenu />} />
-    </Route>
-    <Route path="*" element={<Navigate to="/" />} />
-  </Routes>
-);
-
 function App() {
-  // URL'ye göre admin veya public routes'u göster
-  const isQrMenuMode = window.location.pathname.startsWith("/menu") || 
-                      window.location.pathname.startsWith("/product") || 
-                      window.location.pathname.startsWith("/confirm");
-
   return (
     <BrowserRouter>
       <Toaster position="bottom-center" toastOptions={{ duration: 2000 }} />
-      {isQrMenuMode ? <PublicMenuRoutes /> : <AdminRoutes />}
+      <Routes>
+        {/* Ana sayfa - doğrudan menüye yönlendir */}
+        <Route path="/" element={<Navigate to="/menu" />} />
+        
+        {/* Kullanıcı Deneyimi Sayfaları */}
+        <Route path="/menu" element={<QrMenu />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/confirm" element={<ConfirmOrder />} />
+        <Route path="/feedback" element={<FeedbackForm />} />
+        
+        {/* Admin Giriş ve Admin Paneli Sayfaları */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={
+          <PrivateRoute>
+            <MainLayout />
+          </PrivateRoute>
+        }>
+          <Route index element={<Dashboard />} />
+          <Route path="products" element={<Products />} />
+          <Route path="branch-products" element={<BranchProducts />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="branches/:id/products" element={<BranchProducts />} />
+        </Route>
+        
+        {/* Bulunamayan sayfaları menüye yönlendir */}
+        <Route path="*" element={<Navigate to="/menu" />} />
+      </Routes>
     </BrowserRouter>
   );
 }

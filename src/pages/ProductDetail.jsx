@@ -89,6 +89,11 @@ const ProductDetail = () => {
     // 50-250 piksel arası opacity 1'den 0.5'e kadar düşecek
     return Math.max(1 - (scrollY - 50) / 200 * 0.5, 0.5)
   }
+  
+  // Görsel yüksekliği hesaplaması - daha fazla küçülme etkisi
+  const calculateImageHeight = () => {
+    return Math.max(280 - scrollY * 0.8, 100); // Daha agresif küçülme
+  }
 
   const handleAddToCart = () => {
     const existingCart = JSON.parse(localStorage.getItem("qr_cart") || "[]")
@@ -142,7 +147,7 @@ const ProductDetail = () => {
     return (
       <div className="p-4 text-center">
         <p>Ürün bulunamadı.</p>
-        <button onClick={() => navigate(-1)} className="mt-4 text-blue-600 underline">Geri Dön</button>
+        <button onClick={() => navigate("/menu")} className="mt-4 text-[#1a9c95] underline">Menüye Dön</button>
       </div>
     )
   }
@@ -189,13 +194,13 @@ const ProductDetail = () => {
         )}
       </AnimatePresence>
 
-      <div className="max-w-3xl mx-auto">
+      <div className="relative">
         {/* Ürün Görseli */}
         <div 
           ref={imageRef} 
           className="relative w-full transition-all duration-300 ease-out"
           style={{
-            height: `${Math.max(270 - scrollY * 0.4, 150)}px`,
+            height: `${calculateImageHeight()}px`,
           }}
         >
           <img
@@ -226,7 +231,7 @@ const ProductDetail = () => {
           {/* Sepete Ekle Butonu */}
           <button
             onClick={handleAddToCart}
-            className="absolute top-4 right-4 bg-black/40 text-white rounded-full p-2 backdrop-blur-sm z-10 hover:bg-black/60 transition-colors"
+            className="absolute top-4 right-4 bg-[#1a9c95]/70 text-white rounded-full p-2 backdrop-blur-sm z-10 hover:bg-[#1a9c95] transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -244,12 +249,12 @@ const ProductDetail = () => {
         {/* Ürün İçeriği */}
         <div 
           ref={contentRef}
-          className="px-4 pt-6 pb-12 bg-white rounded-t-3xl -mt-6 relative z-20 shadow-md"
+          className="px-4 pt-6 pb-28 bg-white rounded-t-3xl -mt-6 relative z-20 shadow-md min-h-screen"
         >
           {/* Ürün Adı ve Fiyatı */}
           <div className="flex justify-between items-start mb-3">
             <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-            <div className="text-xl font-bold text-green-600">{product.price} ₺</div>
+            <div className="text-xl font-bold text-[#1a9c95]">{product.price} ₺</div>
           </div>
 
           {/* Ürün Açıklaması */}
@@ -266,7 +271,7 @@ const ProductDetail = () => {
                 key={feature.id} 
                 className={`${
                   activeFeature === feature.id 
-                    ? 'bg-blue-50 ring-2 ring-blue-400' 
+                    ? 'bg-[#f4e9c7] ring-2 ring-[#d49e36]' 
                     : 'bg-gray-50 hover:bg-gray-100'
                 } flex items-center justify-center rounded-full w-12 h-12 cursor-pointer transition-all duration-200 relative`}
                 onClick={() => toggleFeatureDetails(feature.id)}
@@ -297,7 +302,7 @@ const ProductDetail = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-blue-50 rounded-lg p-4 mb-6 overflow-hidden"
+                className="bg-[#f4e9c7] rounded-lg p-4 mb-6 overflow-hidden"
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-white rounded-full p-2 shadow-sm">
@@ -307,11 +312,11 @@ const ProductDetail = () => {
                       className="w-6 h-6"
                     />
                   </div>
-                  <h3 className="font-medium text-blue-900">
+                  <h3 className="font-medium text-[#d49e36]">
                     {productFeatures.find(f => f.id === activeFeature)?.name}
                   </h3>
                 </div>
-                <p className="text-sm text-blue-800">
+                <p className="text-sm text-[#9c7832]">
                   {productFeatures.find(f => f.id === activeFeature)?.description}
                 </p>
               </motion.div>
@@ -322,16 +327,16 @@ const ProductDetail = () => {
           <div className="mb-8">
             <div 
               onClick={() => setShowReviews(!showReviews)}
-              className="bg-blue-50 text-blue-900 px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer hover:bg-blue-100 transition"
+              className="bg-[#f4e9c7] text-[#d49e36] px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer hover:bg-[#f0e4be] transition"
             >
               <div className="flex items-center gap-1">
                 <span className="text-base font-bold">4.5</span>
                 <div className="text-yellow-400 text-sm">★★★★★</div>
-                <span className="ml-2 font-medium text-blue-800">{reviews.length} yorum</span>
+                <span className="ml-2 font-medium text-[#d49e36]">{reviews.length} yorum</span>
               </div>
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
-                className={`h-5 w-5 text-blue-700 transition-transform ${showReviews ? 'rotate-180' : ''}`} 
+                className={`h-5 w-5 text-[#d49e36] transition-transform ${showReviews ? 'rotate-180' : ''}`} 
                 fill="none" 
                 viewBox="0 0 24 24" 
                 stroke="currentColor"
@@ -371,7 +376,7 @@ const ProductDetail = () => {
                       </div>
                     ))}
                     
-                    <button className="text-blue-600 font-medium text-sm">
+                    <button className="text-[#1a9c95] font-medium text-sm">
                       Tüm yorumları gör
                     </button>
                   </div>
@@ -380,9 +385,17 @@ const ProductDetail = () => {
             </AnimatePresence>
           </div>
 
-          {/* Benzer Ürünler */}
+          {/* Sepete Ekle Butonu */}
+          <button
+            onClick={handleAddToCart}
+            className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors mb-8"
+          >
+            Sepete Ekle
+          </button>
+
+          {/* Benzer Ürünler - Daha aşağıda göster */}
           {similarProducts.length > 0 && (
-            <div className="mb-4">
+            <div className="mt-12 mb-6">
               <h3 className="text-lg font-semibold mb-3">Benzer Ürünler</h3>
               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                 {similarProducts.map(item => (
@@ -400,13 +413,14 @@ const ProductDetail = () => {
                     </div>
                     <div className="p-2">
                       <h4 className="font-medium text-sm text-gray-900 truncate">{item.name}</h4>
-                      <p className="text-green-600 font-bold text-sm">{item.price} ₺</p>
+                      <p className="text-[#1a9c95] font-bold text-sm">{item.price} ₺</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          
         </div>
       </div>
     </motion.div>
