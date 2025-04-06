@@ -26,7 +26,7 @@ const CesmeHeader = () => {
   return (
     <>
       {/* Üst Header */}
-      <header className="sticky top-0 z-50 bg-[#1a9c95] text-white p-4 shadow-md flex justify-between items-center">
+      <header className="text-white p-4 shadow-md flex justify-between items-center">
         <div className="flex items-center">
           <button onClick={() => navigate("/menu")} className="mr-3">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,7 +44,7 @@ const CesmeHeader = () => {
 
       {/* Yan Menü */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-[999] flex">
           {/* Overlay - Daha fazla blur */}
           <div 
             className="bg-black/50 flex-1 backdrop-blur-lg" 

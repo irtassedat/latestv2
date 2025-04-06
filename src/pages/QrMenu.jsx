@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import api from "../lib/axios"
 import toast from "react-hot-toast"
-import CesmeHeader from "../components/CesmeHeader" // CesmeHeader bileşenini içe aktardık
+import CesmeHeader from "../components/CesmeHeader"
 
 const QrMenu = () => {
   const [branches, setBranches] = useState([])
@@ -25,6 +25,7 @@ const QrMenu = () => {
   const [showCategoryHeader, setShowCategoryHeader] = useState(false)
   const [showHeader, setShowHeader] = useState(true)
   const categoryObserverRef = useRef(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Promosyon slider verileri
   const promotionSlides = [
@@ -39,7 +40,7 @@ const QrMenu = () => {
     // Buraya daha fazla promosyon eklenebilir
   ]
 
-  // Scroll pozisyonunu izle
+  /// Scroll pozisyonunu izle
   useEffect(() => {
     const handleScroll = () => {
       // Belli bir mesafe scroll edildiğinde header'ı gizle
@@ -53,7 +54,8 @@ const QrMenu = () => {
       const categorySection = document.getElementById('categories-section')
       if (categorySection) {
         const categorySectionTop = categorySection.getBoundingClientRect().top
-        setShowCategoryHeader(categorySectionTop < 0)
+        // Kategori bölümü görünümden çıktığında sabit kategori başlığını göster
+        setShowCategoryHeader(categorySectionTop <= 0)
       }
     }
 
@@ -126,12 +128,12 @@ const QrMenu = () => {
 
   // Modal açıldığında body scroll'u engelle
   useEffect(() => {
-    if (isCartOpen || showFilterModal) {
+    if (isCartOpen || showFilterModal || isMenuOpen) {
       document.body.classList.add("overflow-hidden")
     } else {
       document.body.classList.remove("overflow-hidden")
     }
-  }, [isCartOpen, showFilterModal])
+  }, [isCartOpen, showFilterModal, isMenuOpen])  
 
   const fetchProducts = async () => {
     try {
@@ -292,9 +294,13 @@ const QrMenu = () => {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100" ref={containerRef}>
-      <CesmeHeader />
-
+    <div className="min-h-screen bg-gray-100 pt-16" ref={containerRef}>
+      <div
+        className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'
+          }`}
+      >
+        <CesmeHeader />
+      </div>
       {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
       {showCategoryHeader && (
         <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
@@ -345,42 +351,40 @@ const QrMenu = () => {
 
       <div className="px-4 py-4">
         {/* Promosyon Slider - %100 görünürlük için kesin çözüm */}
-       {/* Promosyon Slider - %100 görünürlük için son düzeltme */}
-<div className="mb-8">
-  <div className="w-full overflow-hidden">
-    {promotionSlides.map((slide, index) => (
-      <div 
-        key={slide.id}
-        className={`${
-          index === currentSlide ? 'block' : 'hidden'
-        }`}
-      >
-        <img
-          src={slide.image}
-          alt={`Promosyon ${index + 1}`}
-          className="w-full h-auto object-contain"
-          style={{ display: 'block', marginBottom: '-6px' }} // Önemli: img elementlerinin altındaki boşluğu kaldırır
-        />
-      </div>
-    ))}
-  </div>
-  
-  {/* Slider Dots */}
-  <div className="relative w-full flex justify-center mt-2">
-    <div className="flex space-x-2">
-      {promotionSlides.map((_, index) => (
-        <button
-          key={index}
-          onClick={() => setCurrentSlide(index)}
-          className={`w-2 h-2 rounded-full transition-all ${
-            index === currentSlide ? 'bg-[#1a9c95] w-4' : 'bg-gray-300'
-          }`}
-          aria-label={`Slayt ${index + 1}`}
-        />
-      ))}
-    </div>
-  </div>
-</div>
+        {/* Promosyon Slider - %100 görünürlük için son düzeltme */}
+        <div className="mb-8">
+          <div className="w-full overflow-hidden">
+            {promotionSlides.map((slide, index) => (
+              <div
+                key={slide.id}
+                className={`${index === currentSlide ? 'block' : 'hidden'
+                  }`}
+              >
+                <img
+                  src={slide.image}
+                  alt={`Promosyon ${index + 1}`}
+                  className="w-full h-auto object-contain"
+                  style={{ display: 'block', marginBottom: '-6px' }} // Önemli: img elementlerinin altındaki boşluğu kaldırır
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Slider Dots */}
+          <div className="relative w-full flex justify-center mt-2">
+            <div className="flex space-x-2">
+              {promotionSlides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-[#1a9c95] w-4' : 'bg-gray-300'
+                    }`}
+                  aria-label={`Slayt ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
         {/* Önerilen Ürünler */}
         {recommendedProducts.length > 0 && (
           <div className="mb-8">
