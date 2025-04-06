@@ -10,6 +10,7 @@ import AdminOrders from "./pages/AdminOrders"
 import ProductDetail from "./pages/ProductDetail"
 import { Toaster } from "react-hot-toast"
 import FeedbackForm from "./pages/FeedbackForm"
+import Heatmap from "./pages/HeatMap" // Yeni Isı Haritası bileşeni
 
 // Kimlik doğrulama kontrolü için basit bir guard fonksiyonu
 const PrivateRoute = ({ children }) => {
@@ -43,6 +44,7 @@ function App() {
           <Route path="branch-products" element={<BranchProducts />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="branches/:id/products" element={<BranchProducts />} />
+          <Route path="heatmap" element={<Heatmap />} /> {/* Yeni Isı Haritası rotası */}
         </Route>
         
         {/* Bulunamayan sayfaları menüye yönlendir */}

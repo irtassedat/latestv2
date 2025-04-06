@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import api from "../lib/axios"
 import toast from "react-hot-toast"
+import CesmeHeader from "../components/CesmeHeader" // CesmeHeader bileşenini içe aktardık
 
 const QrMenu = () => {
   const [branches, setBranches] = useState([])
@@ -15,6 +16,7 @@ const QrMenu = () => {
   const [showFilterModal, setShowFilterModal] = useState(false)
   const containerRef = useRef(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const [selectedCategory, setSelectedCategory] = useState("")
   const [minPrice, setMinPrice] = useState("")
   const [maxPrice, setMaxPrice] = useState("")
@@ -46,7 +48,7 @@ const QrMenu = () => {
       } else {
         setShowHeader(true);
       }
-      
+
       // Kategori başlığının y-pozisyonuna göre sabit başlığı göster/gizle
       const categorySection = document.getElementById('categories-section')
       if (categorySection) {
@@ -79,14 +81,14 @@ const QrMenu = () => {
           // Kategori ID'sinden kategori adını çıkar (section-Çaylar -> Çaylar)
           const categoryName = entry.target.id.replace('section-', '')
           setActiveCategory(categoryName)
-          
+
           // Aktif kategori değiştiğinde yatay scroll'u güncelle
           if (showCategoryHeader) {
             setTimeout(() => {
               const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
               if (fixedCatButton) {
                 fixedCatButton.scrollIntoView({
-                  behavior: "smooth", 
+                  behavior: "smooth",
                   block: "nearest",
                   inline: "center"
                 })
@@ -177,16 +179,16 @@ const QrMenu = () => {
         block: "start",
       })
       setActiveCategory(categoryName)
-      
+
       // Yatay scroll ile kategori butonunu görünür yap
       setTimeout(() => {
         const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
         const fixedNavContainer = document.getElementById('fixed-category-nav')
-        
+
         if (fixedCatButton && fixedNavContainer && showCategoryHeader) {
           // Butonu görünür alana getir
           fixedCatButton.scrollIntoView({
-            behavior: "smooth", 
+            behavior: "smooth",
             block: "nearest",
             inline: "center"
           })
@@ -229,7 +231,7 @@ const QrMenu = () => {
           ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       );
-      
+
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
   }
@@ -270,7 +272,7 @@ const QrMenu = () => {
       .replace(/ş/g, "s")
       .replace(/ü/g, "u")
       .replace(/\s+/g, "-") || "default"
-    
+
   // Önerilen ürünleri filtrele
   const recommendedProducts = products.filter((p) =>
     ["Çeşme Kumru", "Beyaz Peynirli Omlet"].includes(p.name)
@@ -291,21 +293,8 @@ const QrMenu = () => {
 
   return (
     <div className="min-h-screen bg-gray-100" ref={containerRef}>
-      {/* Çeşme Kahvecisi Header - Sadece sayfanın en üstündeyken görünür */}
-      {showHeader && (
-        <header className="sticky top-0 z-50 bg-[#1a9c95] text-white p-4 shadow-md flex justify-between items-center">
-          <h1 className="text-xl font-medium">Çeşme Kahvecisi</h1>
-          <button
-            onClick={() => navigate("/feedback")}
-            className="p-2 rounded-full hover:bg-[#1a9c95]/70"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </header>
-      )}
-      
+      <CesmeHeader />
+
       {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
       {showCategoryHeader && (
         <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
@@ -317,8 +306,8 @@ const QrMenu = () => {
                   id={`fixed-cat-${cat}`}
                   onClick={() => handleCategoryClick(cat)}
                   className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
-                    ${activeCategory === cat 
-                      ? 'bg-white border-[#1a9c95] text-[#1a9c95]' 
+                    ${activeCategory === cat
+                      ? 'bg-white border-[#1a9c95] text-[#1a9c95]'
                       : 'bg-[#1a9c95] text-white border-[#1a9c95] hover:opacity-90'
                     }`}
                 >
@@ -327,7 +316,7 @@ const QrMenu = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Aktif kategori göstergesi */}
           {activeCategory && (
             <div className="bg-[#f4e9c7] py-1 px-4 text-[#d49e36] border-t border-[#e3d5a8] text-sm font-medium">
@@ -355,43 +344,43 @@ const QrMenu = () => {
       )}
 
       <div className="px-4 py-4">
-        {/* Promosyon Slider */}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-lg mb-8">
-          <div className="relative w-full h-48 md:h-52">
-            {/* Slider Items */}
-            <div className="relative w-full h-full">
-              {promotionSlides.map((slide, index) => (
-                <div 
-                  key={slide.id}
-                  className={`absolute inset-0 transition-all duration-700 ease-in-out transform ${
-                    index === currentSlide ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                >
-                  <img
-                    src={slide.image}
-                    alt={`Promosyon ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            
-            {/* Slider Dots */}
-            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex space-x-2">
-              {promotionSlides.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    index === currentSlide ? 'bg-white w-4' : 'bg-white/50'
-                  }`}
-                  aria-label={`Slayt ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
+        {/* Promosyon Slider - %100 görünürlük için kesin çözüm */}
+       {/* Promosyon Slider - %100 görünürlük için son düzeltme */}
+<div className="mb-8">
+  <div className="w-full overflow-hidden">
+    {promotionSlides.map((slide, index) => (
+      <div 
+        key={slide.id}
+        className={`${
+          index === currentSlide ? 'block' : 'hidden'
+        }`}
+      >
+        <img
+          src={slide.image}
+          alt={`Promosyon ${index + 1}`}
+          className="w-full h-auto object-contain"
+          style={{ display: 'block', marginBottom: '-6px' }} // Önemli: img elementlerinin altındaki boşluğu kaldırır
+        />
+      </div>
+    ))}
+  </div>
+  
+  {/* Slider Dots */}
+  <div className="relative w-full flex justify-center mt-2">
+    <div className="flex space-x-2">
+      {promotionSlides.map((_, index) => (
+        <button
+          key={index}
+          onClick={() => setCurrentSlide(index)}
+          className={`w-2 h-2 rounded-full transition-all ${
+            index === currentSlide ? 'bg-[#1a9c95] w-4' : 'bg-gray-300'
+          }`}
+          aria-label={`Slayt ${index + 1}`}
+        />
+      ))}
+    </div>
+  </div>
+</div>
         {/* Önerilen Ürünler */}
         {recommendedProducts.length > 0 && (
           <div className="mb-8">
@@ -457,9 +446,8 @@ const QrMenu = () => {
                 onClick={() => handleCategoryClick(cat)}
                 className="snap-start flex flex-col items-center cursor-pointer"
               >
-                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${
-                  activeCategory === cat ? "ring-2 ring-[#1a9c95]" : ""
-                }`}>
+                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-[#1a9c95]" : ""
+                  }`}>
                   <img
                     src={`/category/${toSlug(cat)}.jpg`}
                     alt={cat}
@@ -499,19 +487,19 @@ const QrMenu = () => {
                     <div className="flex-1">
                       <h3 className="text-base font-semibold">{p.name}</h3>
                       <p className="text-[#1a9c95] font-bold text-sm mb-2">{p.price} ₺</p>
-                      
+
                       {/* Ürün özellikleri ikonları */}
                       <div className="flex gap-2 mt-2">
                         {p.isGlutenFree && (
                           <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                            <img src="/icons/gluten-free.svg" alt="Glutensiz" className="w-4 h-4" 
-                              onError={(e) => {e.target.src = "/uploads/icon-placeholder.png"}} />
+                            <img src="/icons/gluten-free.svg" alt="Glutensiz" className="w-4 h-4"
+                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
                           </div>
                         )}
                         {p.isVegetarian && (
                           <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
                             <img src="/icons/vegetarian.svg" alt="Vejetaryen" className="w-4 h-4"
-                              onError={(e) => {e.target.src = "/uploads/icon-placeholder.png"}} />
+                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
                           </div>
                         )}
                         {p.description && (
@@ -519,14 +507,14 @@ const QrMenu = () => {
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Görsel ve Sepete Ekle Butonu */}
                     <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md relative">
                       <img
                         src={
                           p.image_url &&
-                          p.image_url.trim() !== "" &&
-                          !p.image_url.includes("ibb.co")
+                            p.image_url.trim() !== "" &&
+                            !p.image_url.includes("ibb.co")
                             ? p.image_url
                             : "/uploads/guncellenecek.jpg"
                         }
@@ -555,7 +543,7 @@ const QrMenu = () => {
 
       {/* Filtre Modalı */}
       {showFilterModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center items-center px-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-lg flex justify-center items-center px-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-sm relative shadow-lg">
             <button
               onClick={() => setShowFilterModal(false)}
@@ -567,6 +555,8 @@ const QrMenu = () => {
 
             <div className="space-y-4">
               <input
+                // QrMenu.jsx devamı - Filtreleme kısmı
+
                 type="text"
                 placeholder="Ürün adı"
                 value={searchTerm}
@@ -620,7 +610,7 @@ const QrMenu = () => {
 
               <button
                 onClick={() => setShowFilterModal(false)}
-                className="w-full bg-green-600 text-white py-2 rounded"
+                className="w-full bg-[#1a9c95] text-white py-2 rounded"
               >
                 Uygula
               </button>
@@ -631,10 +621,10 @@ const QrMenu = () => {
 
       {/* Sepet Modalı */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-lg flex items-center justify-center px-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-6 relative">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">🛒 Sepet</h3>
+            <div className="flex justify-between items-center mb-4 border-b border-[#1a9c95]/20 pb-3">
+              <h3 className="text-xl font-bold text-[#1a9c95]">🛒 Sepet</h3>
               <button
                 onClick={() => setIsCartOpen(false)}
                 className="text-gray-500 hover:text-gray-800"
@@ -642,7 +632,7 @@ const QrMenu = () => {
                 ✕
               </button>
             </div>
-            
+
             {cart.length === 0 ? (
               <div className="py-8 text-center">
                 <div className="text-4xl mb-2">🛒</div>
@@ -655,14 +645,14 @@ const QrMenu = () => {
                   <div key={item.id} className="flex justify-between items-center border-b py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-md overflow-hidden">
-                        <img 
+                        <img
                           src={
                             item.image_url && !item.image_url.includes("ibb.co")
                               ? item.image_url
                               : "/uploads/guncellenecek.jpg"
-                          } 
+                          }
                           alt={item.name}
-                          className="w-full h-full object-cover" 
+                          className="w-full h-full object-cover"
                         />
                       </div>
                       <div>
@@ -705,21 +695,21 @@ const QrMenu = () => {
                   </div>
                 ))}
 
-                <div className="mt-4 flex justify-between items-center py-2 border-t border-b">
+                <div className="mt-4 flex justify-between items-center py-3 border-t border-b">
                   <span className="font-medium">Toplam</span>
                   <span className="text-lg font-bold text-[#1a9c95]">
                     {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} ₺
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-2 mt-4">
+                <div className="flex flex-col gap-2 mt-6">
                   <button
                     className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors"
                     onClick={() => {
                       const currentCart = [...cart];
-                      navigate("/confirm", { 
+                      navigate("/confirm", {
                         state: { cart: currentCart },
-                        search: location.search 
+                        search: location.search
                       });
                     }}
                   >

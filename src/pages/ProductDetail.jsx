@@ -18,7 +18,7 @@ const ProductDetail = () => {
   const imageRef = useRef(null)
   const contentRef = useRef(null)
 
-  // Ürün özellikleri örneği - bunlar API'den gelebilir veya ürün nesnesine eklenebilir
+  // Ürün özellikleri örneği (to do:API Geliştirmesi YAP!)
   const productFeatures = [
     { id: 1, name: "Glutensiz", icon: "gluten-free", description: "Bu ürün gluten içermez ve çölyak hastaları için uygundur." },
     { id: 2, name: "Sütsüz", icon: "milk-free", description: "Bu ürün süt ve süt ürünleri içermez, laktoz intoleransı olanlar için uygundur." },
@@ -78,7 +78,7 @@ const ProductDetail = () => {
   const calculateBlur = () => {
     if (scrollY < 50) return 0
     
-    // 50-200 piksel arası blur 0'dan 8px'e kadar artacak
+    // 50-200 piksel arası blur 
     const blurValue = Math.min((scrollY - 50) / 20, 8)
     return blurValue
   }
@@ -86,13 +86,12 @@ const ProductDetail = () => {
   const calculateOpacity = () => {
     if (scrollY < 50) return 1
     
-    // 50-250 piksel arası opacity 1'den 0.5'e kadar düşecek
     return Math.max(1 - (scrollY - 50) / 200 * 0.5, 0.5)
   }
   
-  // Görsel yüksekliği hesaplaması - daha fazla küçülme etkisi
+  // Görsel yüksekliği hesaplaması
   const calculateImageHeight = () => {
-    return Math.max(280 - scrollY * 0.8, 100); // Daha agresif küçülme
+    return Math.max(280 - scrollY * 0.8, 100); 
   }
 
   const handleAddToCart = () => {
@@ -137,11 +136,6 @@ const ProductDetail = () => {
       }
     }
   }
-  
-  const swipeHandlers = useSwipeable({
-    onSwipedDown: () => setIsImageFullscreen(false),
-    trackMouse: true
-  })
 
   if (!product) {
     return (
@@ -160,40 +154,6 @@ const ProductDetail = () => {
       transition={{ duration: 0.3 }}
       className="bg-gray-50 min-h-screen"
     >
-      {/* Tam ekran görsel modali */}
-      <AnimatePresence>
-        {isImageFullscreen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-            onClick={() => setIsImageFullscreen(false)}
-            {...swipeHandlers}
-          >
-            <div className="relative w-full h-full">
-              <img
-                src={
-                  product.image_url && !product.image_url.includes("ibb.co")
-                    ? product.image_url
-                    : "/uploads/guncellenecek.jpg"
-                }
-                alt={product.name}
-                className="w-full h-full object-contain"
-              />
-              <button
-                onClick={() => setIsImageFullscreen(false)}
-                className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="relative">
         {/* Ürün Görseli */}
         <div 
@@ -211,7 +171,6 @@ const ProductDetail = () => {
             }
             alt={product.name}
             className="w-full h-full object-cover transition-all duration-300 ease-out"
-            onClick={() => setIsImageFullscreen(true)}
             style={{ 
               filter: `blur(${calculateBlur()}px)`, 
               opacity: calculateOpacity(),
@@ -237,13 +196,6 @@ const ProductDetail = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </button>
-          
-          {/* Zoom İkonu */}
-          <div className="absolute bottom-4 right-4 bg-white/70 backdrop-blur-sm rounded-full p-2 z-10">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
         </div>
 
         {/* Ürün İçeriği */}
@@ -384,43 +336,37 @@ const ProductDetail = () => {
               )}
             </AnimatePresence>
           </div>
+      
 
-          {/* Sepete Ekle Butonu */}
-          <button
-            onClick={handleAddToCart}
-            className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors mb-8"
-          >
-            Sepete Ekle
-          </button>
-
-          {/* Benzer Ürünler - Daha aşağıda göster */}
-          {similarProducts.length > 0 && (
-            <div className="mt-12 mb-6">
-              <h3 className="text-lg font-semibold mb-3">Benzer Ürünler</h3>
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                {similarProducts.map(item => (
-                  <div 
-                    key={item.id}
-                    onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
-                    className="min-w-[140px] rounded-xl overflow-hidden shadow-sm bg-white border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
-                  >
-                    <div className="h-20 overflow-hidden">
-                      <img
-                        src={item.image_url || "/uploads/guncellenecek.jpg"}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
+          {/* Benzer Ürünler - */}
+          <div className="sticky bottom-0 pt-6 pb-4 bg-white border-t mt-12">
+            {similarProducts.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">⭐ Benzer Ürünler</h3>
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {similarProducts.map(item => (
+                    <div 
+                      key={item.id}
+                      onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
+                      className="min-w-[140px] rounded-xl overflow-hidden shadow-sm bg-white border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+                    >
+                      <div className="h-20 overflow-hidden">
+                        <img
+                          src={item.image_url || "/uploads/guncellenecek.jpg"}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="p-2">
+                        <h4 className="font-medium text-sm text-gray-900 truncate">{item.name}</h4>
+                        <p className="text-[#1a9c95] font-bold text-sm">{item.price} ₺</p>
+                      </div>
                     </div>
-                    <div className="p-2">
-                      <h4 className="font-medium text-sm text-gray-900 truncate">{item.name}</h4>
-                      <p className="text-[#1a9c95] font-bold text-sm">{item.price} ₺</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

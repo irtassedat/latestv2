@@ -43,10 +43,54 @@ const Dashboard = () => {
 
   // Admin paneli menü öğeleri
   const menuItems = [
-    { title: "Ürünler", icon: "📦", path: "/products", color: "bg-blue-500", description: "Tüm ürünleri yönetin" },
-    { title: "Şube Ürünleri", icon: "🏪", path: "/branch-products", color: "bg-green-500", description: "Şubelere özel ürünler" },
-    { title: "Siparişler", icon: "🧾", path: "/admin/orders", color: "bg-amber-500", description: "Tüm siparişleri görüntüleyin" },
-    { title: "QR Menü", icon: "📱", path: "/menu", color: "bg-purple-500", description: "QR Menü önizleme" },
+    { 
+      title: "Ürünler", 
+      icon: "📦", 
+      path: "/admin/products", 
+      color: "bg-blue-500", 
+      description: "Tüm ürünleri yönetin",
+      features: ["Excel/PDF export", "Toplu düzenleme", "Kategori yönetimi"]
+    },
+    { 
+      title: "Şube Ürünleri", 
+      icon: "🏪", 
+      path: "/admin/branch-products", 
+      color: "bg-green-500", 
+      description: "Şubelere özel ürünler",
+      features: ["Stok takibi", "Görünürlük kontrolü", "Fiyat güncellemeleri"]
+    },
+    { 
+      title: "Siparişler", 
+      icon: "🧾", 
+      path: "/admin/orders", 
+      color: "bg-amber-500", 
+      description: "Tüm siparişleri görüntüleyin",
+      features: ["Sipariş takibi", "Durum güncelleme", "Excel/PDF export"]
+    },
+    { 
+      title: "QR Menü", 
+      icon: "📱", 
+      path: "/menu", 
+      color: "bg-purple-500", 
+      description: "QR Menü önizleme",
+      features: ["Müşteri görünümü", "Mobil uyumluluk", "Canlı test"]
+    },
+    { 
+      title: "Isı Haritası", 
+      icon: "🔥", 
+      path: "/admin/heatmap", 
+      color: "bg-red-500", 
+      description: "Kullanıcı davranışları analizi",
+      features: ["Ürün popülaritesi", "Sayfa ziyaret analizi", "Tıklama verileri"]
+    },
+    { 
+      title: "Analitik", 
+      icon: "📊", 
+      path: "/admin/analytics", 
+      color: "bg-indigo-500", 
+      description: "Detaylı raporlar ve analizler",
+      features: ["Satış grafikleri", "Trend analizi", "Performans raporu"]
+    },
   ]
 
   if (loading) {
@@ -111,8 +155,8 @@ const Dashboard = () => {
       </div>
 
       {/* Ana Menü Kartları */}
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Hızlı Erişim</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">Yönetim Araçları</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {menuItems.map((item, index) => (
           <Link 
             key={index} 
@@ -124,12 +168,65 @@ const Dashboard = () => {
               <span className="text-3xl">{item.icon}</span>
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">{item.title}</h3>
-            <p className="text-sm text-gray-500">{item.description}</p>
+            <p className="text-sm text-gray-500 mb-4">{item.description}</p>
+            
+            {/* Özellik listesi */}
+            <div className="space-y-1 mt-3">
+              {item.features.map((feature, idx) => (
+                <div key={idx} className="flex items-center text-xs text-gray-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mr-2"></span>
+                  {feature}
+                </div>
+              ))}
+            </div>
           </Link>
         ))}
       </div>
 
-      {/* Son Siparişler */}
+      {/* Isı Haritası Önizleme */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Kullanıcı Davranış Analizi</h2>
+          <Link to="/admin/heatmap" className="text-blue-600 text-sm hover:underline">
+            Detaylı Rapor →
+          </Link>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="relative">
+            <img 
+              src="/analytics/heatmap-preview.jpg" 
+              alt="Isı Haritası Önizleme"
+              className="w-full rounded-lg"
+              onError={(e) => {
+                e.target.src = "https://via.placeholder.com/800x400?text=Isı+Haritası+Önizleme"
+                e.target.onerror = null
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
+              <div className="text-white">
+                <h3 className="font-bold">Popüler İçerikler</h3>
+                <p className="text-sm">Kahveler ve Tatlılar kategorilerinde yoğunlaşma</p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h4 className="font-medium text-sm">En Çok Tıklanan</h4>
+              <p className="text-xl font-bold text-[#1a9c95]">Türk Kahvesi</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h4 className="font-medium text-sm">Sayfa Kalma Süresi</h4>
+              <p className="text-xl font-bold text-[#1a9c95]">2.4 dk</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <h4 className="font-medium text-sm">Dönüşüm Oranı</h4>
+              <p className="text-xl font-bold text-[#1a9c95]">%18.5</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Son Siparişler ve Hızlı İşlemler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -172,7 +269,7 @@ const Dashboard = () => {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Hızlı İşlemler</h2>
             <div className="space-y-3">
               <button 
-                onClick={() => navigate("/products")} 
+                onClick={() => navigate("/admin/products")} 
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -183,12 +280,23 @@ const Dashboard = () => {
               </button>
               
               <button 
-                onClick={() => navigate("/branch-products")} 
+                onClick={() => navigate("/admin/branch-products")} 
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
                   <span className="text-green-600">🔄</span>
                   <span className="font-medium">Şube Ürünlerini Güncelle</span>
+                </span>
+                <span className="text-gray-400">→</span>
+              </button>
+              
+              <button 
+                onClick={() => navigate("/admin/orders")} 
+                className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-amber-600">🧾</span>
+                  <span className="font-medium">Siparişleri Yönet</span>
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
@@ -200,6 +308,17 @@ const Dashboard = () => {
                 <span className="flex items-center gap-2">
                   <span className="text-purple-600">📱</span>
                   <span className="font-medium">QR Menüyü Önizle</span>
+                </span>
+                <span className="text-gray-400">→</span>
+              </button>
+              
+              <button 
+                onClick={() => navigate("/admin/heatmap")} 
+                className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-red-600">🔥</span>
+                  <span className="font-medium">Isı Haritası Analizi</span>
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
