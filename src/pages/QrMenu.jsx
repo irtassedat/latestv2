@@ -133,14 +133,43 @@ const QrMenu = () => {
     } else {
       document.body.classList.remove("overflow-hidden")
     }
-  }, [isCartOpen, showFilterModal, isMenuOpen])  
+  }, [isCartOpen, showFilterModal, isMenuOpen])
 
+  // This is an excerpt from QrMenu.jsx that needs to be updated
+
+  // Change this function to be more resilient
   const fetchProducts = async () => {
     try {
-      const res = await api.get(`/branches/${selectedBranchId}/products`)
-      setProducts(res.data)
+      // First check if branches exist
+      const branchResponse = await api.get('/branches');
+
+      // Only if branches exist, try to fetch branch products
+      if (branchResponse.data && branchResponse.data.length > 0) {
+        // Use the first available branch ID if selectedBranchId doesn't exist yet
+        const targetBranchId = selectedBranchId || branchResponse.data[0].id;
+
+        // Update selectedBranchId if needed
+        if (!selectedBranchId) {
+          setSelectedBranchId(targetBranchId);
+        }
+
+        // Now fetch the products for this branch
+        const productResponse = await api.get(`/branches/${targetBranchId}/products`);
+        setProducts(productResponse.data);
+      } else {
+        console.warn("No branches found. Cannot fetch products.");
+        setProducts([]);
+      }
     } catch (err) {
-      console.error("Ürünler yüklenirken hata:", err.message)
+      console.error("Ürünler yüklenirken hata:", err.message);
+
+      // Fallback for demo - display some placeholder data if API fails
+      if (process.env.NODE_ENV !== 'production') {
+        setProducts([
+          { id: 1, name: "Placeholder Item 1", price: 10, category_name: "Kahveler" },
+          { id: 2, name: "Placeholder Item 2", price: 15, category_name: "Tatlılar" }
+        ]);
+      }
     }
   }
 
