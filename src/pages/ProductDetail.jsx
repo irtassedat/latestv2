@@ -25,7 +25,7 @@ const ProductDetail = () => {
     { id: 3, name: "Vejetaryen", icon: "vegetarian", description: "Bu ürün et içermez ve vejetaryen beslenme için uygundur." },
     { id: 4, name: "Organik", icon: "organic", description: "Bu ürün organik sertifikalı malzemelerle hazırlanmıştır." },
   ]
-  
+
   // Yorum örneği - bunlar da API'den gelebilir
   const reviews = [
     { id: 1, author: "Ahmet Y.", rating: 5, text: "Çok lezzetli, kesinlikle tavsiye ederim", date: "12.03.2023" },
@@ -35,16 +35,16 @@ const ProductDetail = () => {
   // Benzer ürünleri kategori bazlı getir
   const fetchSimilarProducts = async () => {
     if (!product || !product.category_id) return
-    
+
     try {
       setLoading(true)
       const response = await api.get(`/products/branch/1`) // Şube ID'yi dinamik alabilirsiniz
-      
+
       // Aynı kategorideki diğer ürünleri filtrele
       const filtered = response.data
         .filter(p => p.category_id === product.category_id && p.id !== product.id)
         .slice(0, 5) // Sadece 5 ürün göster
-        
+
       setSimilarProducts(filtered)
     } catch (err) {
       console.error("Benzer ürünler yüklenirken hata:", err)
@@ -61,14 +61,14 @@ const ProductDetail = () => {
   useEffect(() => {
     // Scroll izleme
     window.addEventListener('scroll', handleScroll)
-    
+
     // Scroll pozisyonunu en üste ayarla
     window.scrollTo(0, 0)
     setScrollY(0)
-    
+
     // Benzer ürünleri yükle
     fetchSimilarProducts()
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll)
     }
@@ -77,7 +77,7 @@ const ProductDetail = () => {
   // Blur ve opaklık hesaplamaları
   const calculateBlur = () => {
     if (scrollY < 50) return 0
-    
+
     // 50-200 piksel arası blur 
     const blurValue = Math.min((scrollY - 50) / 20, 8)
     return blurValue
@@ -85,13 +85,14 @@ const ProductDetail = () => {
 
   const calculateOpacity = () => {
     if (scrollY < 50) return 1
-    
+
     return Math.max(1 - (scrollY - 50) / 200 * 0.5, 0.5)
   }
-  
-  // Görsel yüksekliği hesaplaması
+
+  // Görsel yüksekliği hesaplaması - daha iyi görünüm için ayarlandı
   const calculateImageHeight = () => {
-    return Math.max(280 - scrollY * 0.8, 100); 
+    // Sabit yükseklik yerine daha büyük bir başlangıç değeri ve daha yavaş bir azalma
+    return Math.max(350 - scrollY * 0.5, 200);
   }
 
   const handleAddToCart = () => {
@@ -100,14 +101,14 @@ const ProductDetail = () => {
 
     const updatedCart = existingItem
       ? existingCart.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
+        item.id === product.id
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
       : [...existingCart, { ...product, quantity: 1 }]
 
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
-    
+
     // Daha görünür toast mesajı
     toast.success(`${product.name} sepete eklendi!`, {
       duration: 3000,
@@ -122,7 +123,7 @@ const ProductDetail = () => {
       icon: '🛒',
     })
   }
-  
+
   const toggleFeatureDetails = (featureId) => {
     if (activeFeature === featureId) {
       setActiveFeature(null)
@@ -155,12 +156,15 @@ const ProductDetail = () => {
       className="bg-gray-50 min-h-screen"
     >
       <div className="relative">
-        {/* Ürün Görseli */}
-        <div 
-          ref={imageRef} 
+        {/* Ürün Görseli - Tam Genişlik İçin Ayarlandı */}
+        <div
+          ref={imageRef}
           className="relative w-full transition-all duration-300 ease-out"
           style={{
             height: `${calculateImageHeight()}px`,
+            overflow: 'hidden',
+            margin: 0,
+            padding: 0,
           }}
         >
           <img
@@ -171,12 +175,16 @@ const ProductDetail = () => {
             }
             alt={product.name}
             className="w-full h-full object-cover transition-all duration-300 ease-out"
-            style={{ 
-              filter: `blur(${calculateBlur()}px)`, 
+            style={{
+              filter: `blur(${calculateBlur()}px)`,
               opacity: calculateOpacity(),
+              objectPosition: 'center',
+              width: '100%',
+              margin: 0,
+              padding: 0,
             }}
           />
-          
+
           {/* Geri Butonu */}
           <button
             onClick={() => navigate(-1)}
@@ -186,7 +194,7 @@ const ProductDetail = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          
+
           {/* Sepete Ekle Butonu */}
           <button
             onClick={handleAddToCart}
@@ -198,16 +206,34 @@ const ProductDetail = () => {
           </button>
         </div>
 
-        {/* Ürün İçeriği */}
-        <div 
+        {/* Ürün İçeriği - Daha Yumuşak Radius ve Daha Yüksek Konum */}
+        <div
           ref={contentRef}
-          className="px-4 pt-6 pb-28 bg-white rounded-t-3xl -mt-6 relative z-20 shadow-md min-h-screen"
+          className="px-4 pt-6 pb-28 bg-white rounded-t-[30px] -mt-10 relative z-20 shadow-lg min-h-screen"
+          style={{
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.08)'
+          }}
         >
-          {/* Ürün Adı ve Fiyatı */}
-          <div className="flex justify-between items-start mb-3">
-            <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-            <div className="text-xl font-bold text-[#1a9c95]">{product.price} ₺</div>
+          <div className="flex items-start mb-3">
+            {/* Ürün adı */}
+            <div className="flex-1 pr-3">
+              <h1 className="text-xl font-bold text-gray-900 leading-snug break-words">
+                {product.name}
+              </h1>
+            </div>
+
+            {/* Fiyat kutusu */}
+            <div className="min-w-[80px] px-2 py-1 bg-white rounded-md text-right">
+              <div className="text-lg font-semibold text-[#1a9c95] flex items-center justify-end gap-1">
+                <span>{product.price}</span>
+                {/* TL Simgesi */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2v2.5L9.5 6v1.5L12 6.5v2L9.5 10v1.5L12 10.5V13h2v-2.5l2.5-1V8l-2.5 1V7l2.5-1V4.5L14 6V2h-2z" />
+                </svg>
+              </div>
+            </div>
           </div>
+
 
           {/* Ürün Açıklaması */}
           {product.description && (
@@ -219,17 +245,16 @@ const ProductDetail = () => {
           {/* Ürün Özellikleri (Sadece İkonlar) */}
           <div className="flex flex-wrap gap-3 mb-4">
             {productFeatures.map(feature => (
-              <div 
-                key={feature.id} 
-                className={`${
-                  activeFeature === feature.id 
-                    ? 'bg-[#f4e9c7] ring-2 ring-[#d49e36]' 
-                    : 'bg-gray-50 hover:bg-gray-100'
-                } flex items-center justify-center rounded-full w-12 h-12 cursor-pointer transition-all duration-200 relative`}
+              <div
+                key={feature.id}
+                className={`${activeFeature === feature.id
+                  ? 'bg-[#f4e9c7] ring-2 ring-[#d49e36]'
+                  : 'bg-gray-50 hover:bg-gray-100'
+                  } flex items-center justify-center rounded-full w-12 h-12 cursor-pointer transition-all duration-200 relative`}
                 onClick={() => toggleFeatureDetails(feature.id)}
               >
-                <img 
-                  src={`/icons/${feature.icon}.svg`} 
+                <img
+                  src={`/icons/${feature.icon}.svg`}
                   alt={feature.name}
                   className="w-7 h-7"
                   onError={(e) => {
@@ -237,7 +262,7 @@ const ProductDetail = () => {
                     e.target.src = "/icons/default.svg";
                   }}
                 />
-                
+
                 {/* Kısa tooltip */}
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -translate-y-1 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                   {feature.name}
@@ -258,8 +283,8 @@ const ProductDetail = () => {
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-white rounded-full p-2 shadow-sm">
-                    <img 
-                      src={`/icons/${productFeatures.find(f => f.id === activeFeature)?.icon}.svg`} 
+                    <img
+                      src={`/icons/${productFeatures.find(f => f.id === activeFeature)?.icon}.svg`}
                       alt={productFeatures.find(f => f.id === activeFeature)?.name}
                       className="w-6 h-6"
                     />
@@ -277,7 +302,7 @@ const ProductDetail = () => {
 
           {/* Yorum Kartı */}
           <div className="mb-8">
-            <div 
+            <div
               onClick={() => setShowReviews(!showReviews)}
               className="bg-[#f4e9c7] text-[#d49e36] px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer hover:bg-[#f0e4be] transition"
             >
@@ -286,17 +311,17 @@ const ProductDetail = () => {
                 <div className="text-yellow-400 text-sm">★★★★★</div>
                 <span className="ml-2 font-medium text-[#d49e36]">{reviews.length} yorum</span>
               </div>
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className={`h-5 w-5 text-[#d49e36] transition-transform ${showReviews ? 'rotate-180' : ''}`} 
-                fill="none" 
-                viewBox="0 0 24 24" 
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-5 w-5 text-[#d49e36] transition-transform ${showReviews ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
-            
+
             {/* Yorumlar Listesi */}
             <AnimatePresence>
               {showReviews && (
@@ -316,8 +341,8 @@ const ProductDetail = () => {
                         </div>
                         <div className="flex items-center mb-2">
                           {[1, 2, 3, 4, 5].map(star => (
-                            <span 
-                              key={star} 
+                            <span
+                              key={star}
                               className={star <= review.rating ? 'text-yellow-400' : 'text-gray-300'}
                             >
                               ★
@@ -327,7 +352,7 @@ const ProductDetail = () => {
                         <p className="text-gray-700 text-sm">{review.text}</p>
                       </div>
                     ))}
-                    
+
                     <button className="text-[#1a9c95] font-medium text-sm">
                       Tüm yorumları gör
                     </button>
@@ -336,25 +361,26 @@ const ProductDetail = () => {
               )}
             </AnimatePresence>
           </div>
-      
 
-          {/* Benzer Ürünler - */}
+          {/* Benzer Ürünler */}
           <div className="sticky bottom-0 pt-6 pb-4 bg-white border-t mt-12">
             {similarProducts.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">⭐ Benzer Ürünler</h3>
                 <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
                   {similarProducts.map(item => (
-                    <div 
+                    <div
                       key={item.id}
                       onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
                       className="min-w-[140px] rounded-xl overflow-hidden shadow-sm bg-white border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
                     >
-                      <div className="h-20 overflow-hidden">
+                      {/* Görsel Kapsayıcı - Tam kare formatta */}
+                      <div className="aspect-square w-full overflow-hidden bg-gray-50">
                         <img
                           src={item.image_url || "/uploads/guncellenecek.jpg"}
                           alt={item.name}
                           className="w-full h-full object-cover"
+                          style={{ objectPosition: 'center' }}
                         />
                       </div>
                       <div className="p-2">
@@ -369,6 +395,31 @@ const ProductDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Tam Ekran Görüntü İçin CSS Düzenlemeleri */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        body {
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+        }
+        
+        img {
+          max-width: 100%;
+          display: block;
+        }
+        
+        /* Sağ ve sol boşlukları yok etmek için */
+        @media (max-width: 767px) {
+          .relative > div:first-child {
+            left: 0;
+            right: 0;
+            width: 100vw;
+            max-width: 100vw;
+          }
+        }
+      `}} />
     </motion.div>
   )
 }

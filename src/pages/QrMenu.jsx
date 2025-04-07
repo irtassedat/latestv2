@@ -25,7 +25,9 @@ const QrMenu = () => {
   const [showCategoryHeader, setShowCategoryHeader] = useState(false)
   const [showHeader, setShowHeader] = useState(true)
   const categoryObserverRef = useRef(null)
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [sliderContainerHeight, setSliderContainerHeight] = useState(0)
+  const sliderContainerRef = useRef(null)
 
   // Promosyon slider verileri
   const promotionSlides = [
@@ -39,6 +41,30 @@ const QrMenu = () => {
     }
     // Buraya daha fazla promosyon eklenebilir
   ]
+
+  // Slider boyutlarını hesapla
+  useEffect(() => {
+    const calculateSliderHeight = () => {
+      if (!sliderContainerRef.current) return;
+
+      const containerWidth = sliderContainerRef.current.offsetWidth;
+      // 1920x500 oranını koruyarak yüksekliği hesapla
+      const aspectRatio = 1920 / 500;
+      const calculatedHeight = containerWidth / aspectRatio;
+
+      setSliderContainerHeight(calculatedHeight);
+    }
+
+    // İlk yüklemede hesapla
+    calculateSliderHeight();
+
+    // Pencere boyutu değiştiğinde tekrar hesapla
+    window.addEventListener('resize', calculateSliderHeight);
+
+    return () => {
+      window.removeEventListener('resize', calculateSliderHeight);
+    }
+  }, []);
 
   /// Scroll pozisyonunu izle
   useEffect(() => {
@@ -134,8 +160,6 @@ const QrMenu = () => {
       document.body.classList.remove("overflow-hidden")
     }
   }, [isCartOpen, showFilterModal, isMenuOpen])
-
-  // This is an excerpt from QrMenu.jsx that needs to be updated
 
   // Change this function to be more resilient
   const fetchProducts = async () => {
@@ -322,6 +346,16 @@ const QrMenu = () => {
     return () => window.removeEventListener("focus", syncCart)
   }, [])
 
+  // Resimlerin yüklendiğini kontrol etmek için
+  const handleImageLoad = (e) => {
+    // Görsel yüklendiğinde boyutu güncelleyebiliriz
+    if (sliderContainerRef.current && e.target.naturalWidth) {
+      const imgAspectRatio = e.target.naturalWidth / e.target.naturalHeight;
+      const containerWidth = sliderContainerRef.current.offsetWidth;
+      setSliderContainerHeight(containerWidth / imgAspectRatio);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 pt-16" ref={containerRef}>
       <div
@@ -379,21 +413,34 @@ const QrMenu = () => {
       )}
 
       <div className="px-4 py-4">
-        {/* Promosyon Slider - %100 görünürlük için kesin çözüm */}
-        {/* Promosyon Slider - %100 görünürlük için son düzeltme */}
+        {/* Promosyon Slider - İyileştirilmiş */}
         <div className="mb-8">
-          <div className="w-full overflow-hidden">
+          <div
+            ref={sliderContainerRef}
+            className="w-full overflow-hidden relative bg-transparent"
+            style={{
+              height: `${sliderContainerHeight}px`,
+              backgroundColor: 'rgba(0, 0, 0, 0.05)' // Şeffaf gri arkaplan
+            }}
+          >
             {promotionSlides.map((slide, index) => (
               <div
                 key={slide.id}
-                className={`${index === currentSlide ? 'block' : 'hidden'
+                className={`absolute inset-0 flex items-center justify-center ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
+                style={{
+                  transition: 'opacity 0.5s ease-in-out'
+                }}
               >
                 <img
                   src={slide.image}
                   alt={`Promosyon ${index + 1}`}
-                  className="w-full h-auto object-contain"
-                  style={{ display: 'block', marginBottom: '-6px' }} // Önemli: img elementlerinin altındaki boşluğu kaldırır
+                  className="max-w-full max-h-full object-contain"
+                  onLoad={handleImageLoad}
+                  onError={(e) => {
+                    console.error("Görsel yüklenemedi:", e);
+                    e.target.src = "/uploads/placeholder.jpg";
+                  }}
                 />
               </div>
             ))}
@@ -514,35 +561,10 @@ const QrMenu = () => {
                   <div
                     key={p.id}
                     onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
-                    className="w-full bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition cursor-pointer relative"
+                    className="w-full bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition cursor-pointer relative group"
                   >
-                    {/* Ürün Detayları ve İkon Alanı */}
-                    <div className="flex-1">
-                      <h3 className="text-base font-semibold">{p.name}</h3>
-                      <p className="text-[#1a9c95] font-bold text-sm mb-2">{p.price} ₺</p>
-
-                      {/* Ürün özellikleri ikonları */}
-                      <div className="flex gap-2 mt-2">
-                        {p.isGlutenFree && (
-                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                            <img src="/icons/gluten-free.svg" alt="Glutensiz" className="w-4 h-4"
-                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
-                          </div>
-                        )}
-                        {p.isVegetarian && (
-                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                            <img src="/icons/vegetarian.svg" alt="Vejetaryen" className="w-4 h-4"
-                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
-                          </div>
-                        )}
-                        {p.description && (
-                          <p className="text-xs text-gray-600 line-clamp-1 mt-1">{p.description}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Görsel ve Sepete Ekle Butonu */}
-                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md relative">
+                    {/* Ürün Görseli - Şimdi solda */}
+                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md relative transition-all duration-300 group-hover:scale-105">
                       <img
                         src={
                           p.image_url &&
@@ -559,12 +581,38 @@ const QrMenu = () => {
                           e.stopPropagation();
                           addToCart(p);
                         }}
-                        className="absolute top-1 right-1 bg-[#1a9c95]/70 text-white rounded-full p-1 backdrop-blur-sm hover:bg-[#1a9c95] transition-colors"
+                        className="absolute bottom-1 right-1 bg-[#1a9c95]/80 text-white rounded-full p-1.5 backdrop-blur-sm hover:bg-[#1a9c95] transition-colors"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                       </button>
+                    </div>
+
+                    {/* Ürün Detayları - Şimdi sağda */}
+                    <div className="flex-1 pl-2 group-hover:transform group-hover:translate-y-[-2px] transition-transform duration-300">
+                      <h3 className="text-base font-semibold mb-1">{p.name}</h3>
+                      <p className="text-[#1a9c95] font-bold text-base mb-1">{p.price} ₺</p>
+
+                      {p.description && (
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-2">{p.description}</p>
+                      )}
+
+                      {/* Ürün özellikleri ikonları */}
+                      <div className="flex gap-2 mt-2">
+                        {p.isGlutenFree && (
+                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                            <img src="/icons/gluten-free.svg" alt="Glutensiz" className="w-4 h-4"
+                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
+                          </div>
+                        )}
+                        {p.isVegetarian && (
+                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                            <img src="/icons/vegetarian.svg" alt="Vejetaryen" className="w-4 h-4"
+                              onError={(e) => { e.target.src = "/uploads/icon-placeholder.png" }} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -588,8 +636,6 @@ const QrMenu = () => {
 
             <div className="space-y-4">
               <input
-                // QrMenu.jsx devamı - Filtreleme kısmı
-
                 type="text"
                 placeholder="Ürün adı"
                 value={searchTerm}

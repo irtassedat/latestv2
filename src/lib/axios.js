@@ -16,11 +16,11 @@ const determineBaseUrl = () => {
   
   // Fallback based on environment
   if (import.meta.env.MODE === 'development') {
-    return 'http://localhost:5000'; // Local development server
+    return 'http://localhost:5050'; // Port 5050 kullanılıyor
   }
   
-  // Production fallback - remove the /api suffix if that's causing the issue
-  return 'https://qr.405found.tr'; // Try without /api prefix
+  // Production fallback
+  return 'https://qr.405found.tr';
 };
 
 const api = axios.create({
@@ -31,10 +31,8 @@ const api = axios.create({
 
 // Request interceptor to fix API path issues
 api.interceptors.request.use(config => {
-  // Check if we need to add /api prefix for production
-  if (import.meta.env.MODE === 'production' && 
-      !config.url.startsWith('/api/') && 
-      !config.url.startsWith('api/')) {
+  // Burada kritik değişiklik: her istekte /api prefix'i olduğundan emin oluyoruz
+  if (!config.url.startsWith('/api/') && !config.url.startsWith('api/')) {
     config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
   }
   
@@ -44,11 +42,10 @@ api.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// Response interceptor for better error handling
+// Response interceptor
 api.interceptors.response.use(
   response => response,
   error => {
-    // Log detailed error information
     console.error("API Error:", {
       endpoint: error.config?.url,
       method: error.config?.method,

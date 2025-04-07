@@ -6,7 +6,16 @@ export default defineConfig({
   plugins: [react()],
   envPrefix: 'VITE_', 
   define: {
-    // Development ortamı için fallback değer
-    'import.meta.env.VITE_API_URL': JSON.stringify('http://localhost:5000'),
+    // Port 5050 olarak güncellenmiş
+    'import.meta.env.VITE_API_URL': JSON.stringify('http://localhost:5050'),
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5050',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
   }
 });
