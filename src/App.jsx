@@ -12,6 +12,7 @@ import { Toaster } from "react-hot-toast"
 import FeedbackForm from "./pages/FeedbackForm"
 import Heatmap from "./pages/HeatMap" // Yeni Isı Haritası bileşeni
 import ClarityAnalytics from "./components/ClarityAnalytics"
+import Branches from "./pages/Branches" // Yeni Şubeler sayfası
 
 // Kimlik doğrulama kontrolü için basit bir guard fonksiyonu
 const PrivateRoute = ({ children }) => {
@@ -34,7 +35,7 @@ function App() {
         <Route path="/confirm" element={<ConfirmOrder />} />
         <Route path="/feedback" element={<FeedbackForm />} />
         
-        {/* Admin Giriş ve Admin Paneli Sayfaları */}
+        {/* Admin Giriş ve Admin Paneli Sayfaları - root path düzeltildi */}
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={
           <PrivateRoute>
@@ -43,6 +44,7 @@ function App() {
         }>
           <Route index element={<Dashboard />} />
           <Route path="products" element={<Products />} />
+          <Route path="branches" element={<Branches />} /> {/* Yeni Şubeler sayfası */}
           <Route path="branch-products" element={<BranchProducts />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="branches/:id/products" element={<BranchProducts />} />

@@ -46,7 +46,7 @@ const Dashboard = () => {
     {
       title: "Ürünler",
       icon: "📦",
-      path: "/admin/products",
+      path: "/admin/branch-products",
       color: "bg-blue-500",
       description: "Tüm ürünleri yönetin",
       features: ["Excel/PDF export", "Toplu düzenleme", "Kategori yönetimi"]

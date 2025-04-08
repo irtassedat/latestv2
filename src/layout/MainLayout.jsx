@@ -6,10 +6,12 @@ const MainLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
 
+  // Düzeltilmiş menu items - "/admin" prefix'i eklendi ve "Ürünler" yerine "Şubeler" eklendi
   const menuItems = [
-    { path: "/", label: "Dashboard", icon: "📊" },
-    { path: "/products", label: "Ürünler", icon: "📦" },
-    { path: "/branch-products", label: "Şube Ürünleri", icon: "🏪" },
+    { path: "/admin", label: "Dashboard", icon: "📊" },
+    { path: "/admin/branches", label: "Şubeler", icon: "🏪" },
+    { path: "/admin/products", label: "Ürünler", icon: "📦" },
+    { path: "/admin/branch-products", label: "Şube Ürünleri", icon: "🏬" },
     { path: "/admin/orders", label: "Siparişler", icon: "🧾" },
     { path: "/menu", label: "QR Menü", icon: "📱" },
   ]
