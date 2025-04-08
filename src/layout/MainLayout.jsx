@@ -23,12 +23,12 @@ const MainLayout = () => {
     <div className="min-h-screen bg-gray-100 flex">
       {/* Sidebar */}
       <div 
-        className={`bg-[#1a3c61] text-white fixed h-full z-40 transition-all duration-300 shadow-lg
+        className={`bg-[#022B45] text-white fixed h-full z-40 transition-all duration-300 shadow-lg
           ${sidebarOpen ? "w-64" : "w-20"}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo ve Toggle */}
-          <div className="p-4 border-b border-blue-800 flex items-center justify-between">
+          <div className="p-4 border-b border-[#022B45]/60 flex items-center justify-between">
             {sidebarOpen ? (
               <div className="font-bold text-lg">Çeşme Kahve</div>
             ) : (
@@ -54,8 +54,8 @@ const MainLayout = () => {
                 to={item.path}
                 className={`flex items-center py-3 px-4 transition-colors ${
                   location.pathname === item.path
-                    ? "bg-blue-800 text-white"
-                    : "text-white/80 hover:bg-blue-900/30"
+                    ? "bg-[#D98A3D] text-white"
+                    : "text-white/80 hover:bg-[#D98A3D]/30"
                 }`}
               >
                 <span className="text-xl">{item.icon}</span>

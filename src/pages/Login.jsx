@@ -53,7 +53,7 @@ const Login = () => {
               <input
                 type="email"
                 placeholder="admin@admin.com"
-                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-[#1a9c95] focus:border-[#1a9c95] outline-none transition"
+                className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD] outline-none transition"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -79,13 +79,13 @@ const Login = () => {
                 <input
                   id="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 accent-[#1a9c95]"
-                />
+                  className="h-4 w-4 accent-[#D98A3D]"
+                  />
                 <label htmlFor="remember-me" className="ml-2 text-gray-600">
                   Beni hatırla
                 </label>
               </div>
-              <a href="#" className="text-[#1a9c95] hover:underline">
+              <a href="#" className="text-[#D98A3D] hover:underline">
                 Şifremi unuttum
               </a>
             </div>
@@ -93,7 +93,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors ${
+              className={`w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors ${
                 isLoading ? "opacity-70 cursor-not-allowed" : ""
               }`}
             >
@@ -111,8 +111,8 @@ const Login = () => {
         <div className="mt-4 text-center">
           <button
             onClick={() => navigate("/menu")}
-            className="text-[#1a9c95] text-sm hover:underline"
-          >
+            className="text-[#D98A3D] text-sm hover:underline"
+            >
             ← Menüye Dön
           </button>
         </div>

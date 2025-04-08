@@ -64,7 +64,7 @@ const CesmeHeader = () => {
   return (
     <>
       {/* Header */}
-      <header className="text-white p-4 shadow-md flex justify-between items-center bg-[#1a9c95] relative z-10">
+      <header className="text-white p-4 shadow-md flex justify-between items-center bg-[#022B45] relative z-10">
         <div className="flex items-center">
         <button 
             onClick={() => {
@@ -132,7 +132,7 @@ const CesmeHeader = () => {
 
                 <button
                   onClick={handleLogin}
-                  className="flex items-center justify-center w-full bg-[#1a9c95] text-white py-4 px-4 rounded-lg hover:bg-[#188a84] mt-4 font-medium"
+                  className="flex items-center justify-center w-full bg-[#022B45] text-white py-4 px-4 rounded-lg hover:bg-[#022B45]/80 mt-4 font-medium"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />

@@ -156,7 +156,7 @@ const ConfirmOrder = () => {
           
           <div className="flex justify-between items-center pt-4 mt-2">
             <span className="font-medium">Toplam Tutar</span>
-            <span className="text-xl font-bold text-green-600">{total.toFixed(2)} ₺</span>
+            <span className="text-xl font-bold text-[#D98A3D]">{total.toFixed(2)} ₺</span>
           </div>
         </div>
 
@@ -174,7 +174,7 @@ const ConfirmOrder = () => {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Adınız Soyadınız"
-                className="w-full border border-gray-300 px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                className="w-full border border-gray-300 px-4 py-3 rounded-xl focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD] outline-none transition"
                 required
               />
             </div>
@@ -197,7 +197,7 @@ const ConfirmOrder = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full bg-green-600 text-white py-3 px-6 rounded-xl font-medium hover:bg-green-700 transition mt-4
+              className={`w-full bg-[#022B45] text-white py-3 px-6 rounded-xl font-medium hover:bg-[#022B45]/80 transition mt-4
                 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}
               `}
             >

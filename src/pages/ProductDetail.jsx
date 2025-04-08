@@ -122,7 +122,7 @@ const ProductDetail = () => {
       },
       icon: '🛒',
     })
-    
+
     // Clarity olay izleme - ürün detay sayfasından sepete ekleme
     if (window.clarity) {
       window.clarity("event", "detail_add_to_cart", {
@@ -132,7 +132,7 @@ const ProductDetail = () => {
         quantity: 1,
         fromPage: "product_detail"
       });
-      
+
       console.log("Clarity: Ürün detayından sepete ekleme izlendi", product.name);
     }
   }
@@ -172,7 +172,7 @@ const ProductDetail = () => {
           price: product.price,
           description: product.description || ""
         });
-        
+
         console.log("Clarity: Ürün detay görüntüleme izlendi", product.name);
       }
     }
@@ -180,7 +180,7 @@ const ProductDetail = () => {
 
 
 
-  
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -232,7 +232,7 @@ const ProductDetail = () => {
           {/* Sepete Ekle Butonu */}
           <button
             onClick={handleAddToCart}
-            className="absolute top-4 right-4 bg-[#1a9c95]/70 text-white rounded-full p-2 backdrop-blur-sm z-10 hover:bg-[#1a9c95] transition-colors"
+            className="absolute top-4 right-4 bg-[#022B45]/70 text-white rounded-full p-2 backdrop-blur-sm z-10 hover:bg-[#022B45] transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -258,7 +258,7 @@ const ProductDetail = () => {
 
             {/* Fiyat kutusu */}
             <div className="min-w-[80px] px-2 py-1 bg-white rounded-md text-right">
-              <div className="text-lg font-semibold text-[#1a9c95] flex items-center justify-end gap-1">
+              <div className="text-lg font-semibold text-[#D98A3D] flex items-center justify-end gap-1">
                 <span>{product.price}</span>
                 {/* TL Simgesi */}
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -282,7 +282,7 @@ const ProductDetail = () => {
               <div
                 key={feature.id}
                 className={`${activeFeature === feature.id
-                  ? 'bg-[#f4e9c7] ring-2 ring-[#d49e36]'
+                  ? 'bg-[#B8D7DD] ring-2 ring-[#D98A3D]'
                   : 'bg-gray-50 hover:bg-gray-100'
                   } flex items-center justify-center rounded-full w-12 h-12 cursor-pointer transition-all duration-200 relative`}
                 onClick={() => toggleFeatureDetails(feature.id)}
@@ -313,7 +313,7 @@ const ProductDetail = () => {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-[#f4e9c7] rounded-lg p-4 mb-6 overflow-hidden"
+                className="bg-[#B8D7DD] rounded-lg p-4 mb-6 overflow-hidden"
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="bg-white rounded-full p-2 shadow-sm">
@@ -323,11 +323,11 @@ const ProductDetail = () => {
                       className="w-6 h-6"
                     />
                   </div>
-                  <h3 className="font-medium text-[#d49e36]">
+                  <h3 className="font-medium text-[#022B45]">
                     {productFeatures.find(f => f.id === activeFeature)?.name}
                   </h3>
                 </div>
-                <p className="text-sm text-[#9c7832]">
+                <p className="text-sm text-[#022B45]">
                   {productFeatures.find(f => f.id === activeFeature)?.description}
                 </p>
               </motion.div>
@@ -338,16 +338,16 @@ const ProductDetail = () => {
           <div className="mb-8">
             <div
               onClick={() => setShowReviews(!showReviews)}
-              className="bg-[#f4e9c7] text-[#d49e36] px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer hover:bg-[#f0e4be] transition"
+              className="bg-[#B8D7DD] text-[#022B45] px-4 py-3 rounded-xl flex justify-between items-center cursor-pointer hover:bg-[#B8D7DD]/90 transition"
             >
               <div className="flex items-center gap-1">
                 <span className="text-base font-bold">4.5</span>
-                <div className="text-yellow-400 text-sm">★★★★★</div>
-                <span className="ml-2 font-medium text-[#d49e36]">{reviews.length} yorum</span>
+                <div className="text-[#D98A3D] text-sm">★★★★★</div>
+                <span className="ml-2 font-medium text-[#022B45]">{reviews.length} yorum</span>
               </div>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className={`h-5 w-5 text-[#d49e36] transition-transform ${showReviews ? 'rotate-180' : ''}`}
+                className={`h-5 w-5 text-[#022B45] transition-transform ${showReviews ? 'rotate-180' : ''}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -366,9 +366,9 @@ const ProductDetail = () => {
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <div className="pt-4 space-y-4">
+                  <div className="pt-4 space-y-4 bg-white rounded-lg mt-2 p-4 border border-[#B8D7DD]/50">
                     {reviews.map(review => (
-                      <div key={review.id} className="border-b pb-4">
+                      <div key={review.id} className="border-b border-[#B8D7DD]/30 pb-4">
                         <div className="flex justify-between mb-1">
                           <span className="font-medium">{review.author}</span>
                           <span className="text-sm text-gray-500">{review.date}</span>
@@ -377,7 +377,7 @@ const ProductDetail = () => {
                           {[1, 2, 3, 4, 5].map(star => (
                             <span
                               key={star}
-                              className={star <= review.rating ? 'text-yellow-400' : 'text-gray-300'}
+                              className={star <= review.rating ? 'text-[#D98A3D]' : 'text-gray-300'}
                             >
                               ★
                             </span>
@@ -387,7 +387,7 @@ const ProductDetail = () => {
                       </div>
                     ))}
 
-                    <button className="text-[#1a9c95] font-medium text-sm">
+                    <button className="text-[#022B45] font-medium text-sm">
                       Tüm yorumları gör
                     </button>
                   </div>
@@ -419,7 +419,7 @@ const ProductDetail = () => {
                       </div>
                       <div className="p-2">
                         <h4 className="font-medium text-sm text-gray-900 truncate">{item.name}</h4>
-                        <p className="text-[#1a9c95] font-bold text-sm">{item.price} ₺</p>
+                        <p className="text-[#D98A3D] font-bold text-sm">{item.price} ₺</p>
                       </div>
                     </div>
                   ))}

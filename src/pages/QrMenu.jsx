@@ -49,10 +49,10 @@ const QrMenu = () => {
 
       // Normal container genişliği kullan (2 katı değil)
       const containerWidth = sliderContainerRef.current.offsetWidth;
-      
+
       // 16:9 oranında yükseklik belirle - geleneksel slider oranı
-      const calculatedHeight = containerWidth * (9/16);
-      
+      const calculatedHeight = containerWidth * (9 / 16);
+
       setSliderContainerHeight(calculatedHeight);
     }
 
@@ -273,7 +273,7 @@ const QrMenu = () => {
 
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
     setCart(updatedCart)
-    
+
     toast.success(`${product.name} sepete eklendi!`, {
       duration: 3000,
       style: {
@@ -294,7 +294,7 @@ const QrMenu = () => {
         quantity: 1,
         cartTotal: updatedCart.reduce((sum, item) => sum + item.price * item.quantity, 0)
       });
-      
+
       console.log("Clarity: Sepete ekleme izlendi", product.name);
     }
   };
@@ -306,10 +306,10 @@ const QrMenu = () => {
           ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       );
-  
+
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
-    
+
     // Clarity sepet güncelleme izleme
     if (window.clarity) {
       const product = cart.find(item => item.id === productId);
@@ -327,7 +327,7 @@ const QrMenu = () => {
     const updatedCart = cart.filter((item) => item.id !== productId);
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
-    
+
     // Clarity sepetten ürün çıkarma izleme
     if (window.clarity && product) {
       window.clarity("event", "remove_from_cart", {
@@ -337,7 +337,7 @@ const QrMenu = () => {
         price: product.price
       });
     }
-    
+
     toast.success("Ürün sepetten çıkarıldı", {
       icon: '🗑️',
       style: {
@@ -355,7 +355,7 @@ const QrMenu = () => {
         totalValue: cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
       });
     }
-    
+
     setCart([]);
     localStorage.removeItem("qr_cart");
     setIsCartOpen(false);
@@ -401,7 +401,7 @@ const QrMenu = () => {
   const handleImageLoad = (e) => {
     if (sliderContainerRef.current && e.target.naturalWidth) {
       const containerWidth = sliderContainerRef.current.offsetWidth;
-      const calculatedHeight = containerWidth * (9/16);
+      const calculatedHeight = containerWidth * (9 / 16);
       setSliderContainerHeight(calculatedHeight);
     }
   }
@@ -409,12 +409,12 @@ const QrMenu = () => {
   const handleProductClick = (product) => {
     // Ürün detay sayfasına yönlendir
     navigate(`/product/${product.id}`, { state: { product } });
-    
+
     // Clarity olay izleme - ürün görüntüleme
     if (window.clarity) {
       // Ürün adını kullanıcı özelliği olarak ayarla
       window.clarity("set", "product_viewed", product.name);
-      
+
       // Özel ürün tıklama olayı
       window.clarity("event", "product_click", {
         productId: product.id,
@@ -422,7 +422,7 @@ const QrMenu = () => {
         category: product.category_name || "Kategori Yok",
         price: product.price
       });
-      
+
       console.log("Clarity: Ürün tıklama izlendi", product.name);
     }
   };
@@ -443,12 +443,11 @@ const QrMenu = () => {
               {Object.keys(groupedWithTeaFirst).map((cat) => (
                 <button
                   key={cat}
-                  id={`fixed-cat-${cat}`}
                   onClick={() => handleCategoryClick(cat)}
                   className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
-                    ${activeCategory === cat
-                      ? 'bg-white border-[#1a9c95] text-[#1a9c95]'
-                      : 'bg-[#1a9c95] text-white border-[#1a9c95] hover:opacity-90'
+                  ${activeCategory === cat
+                      ? 'bg-white border-[#022B45] text-[#022B45]'
+                      : 'bg-[#022B45] text-white border-[#022B45] hover:opacity-90'
                     }`}
                 >
                   {cat.toUpperCase()}
@@ -551,7 +550,7 @@ const QrMenu = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold">{p.name}</h3>
-                    <p className="text-[#1a9c95] font-bold text-sm">{p.price} ₺</p>
+                    <p className="text-[#D98A3D] font-bold text-base mb-1">{p.price} ₺</p>
                   </div>
                 </div>
               ))}
@@ -651,7 +650,7 @@ const QrMenu = () => {
                           e.stopPropagation();
                           addToCart(p);
                         }}
-                        className="absolute bottom-1 right-1 bg-[#1a9c95]/80 text-white rounded-full p-1.5 backdrop-blur-sm hover:bg-[#1a9c95] transition-colors"
+                        className="absolute bottom-1 right-1 bg-[#022B45]/80 text-white rounded-full p-1.5 backdrop-blur-sm hover:bg-[#022B45] transition-colors"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -662,7 +661,7 @@ const QrMenu = () => {
                     {/* Ürün Detayları - Şimdi sağda */}
                     <div className="flex-1 pl-2 group-hover:transform group-hover:translate-y-[-2px] transition-transform duration-300">
                       <h3 className="text-base font-semibold mb-1">{p.name}</h3>
-                      <p className="text-[#1a9c95] font-bold text-base mb-1">{p.price} ₺</p>
+                      <p className="text-[#D98A3D] font-bold text-base mb-1">{p.price} ₺</p>
 
                       {p.description && (
                         <p className="text-sm text-gray-600 line-clamp-2 mb-2">{p.description}</p>
@@ -702,7 +701,7 @@ const QrMenu = () => {
             >
               ❌
             </button>
-            <h3 className="text-lg font-bold mb-4">🔍 Filtrele</h3>
+            <h3 className="text-lg font-bold mb-4 text-[#022B45]">🔍 Filtrele</h3>
 
             <div className="space-y-4">
               <input
@@ -710,7 +709,7 @@ const QrMenu = () => {
                 placeholder="Ürün adı"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
               />
 
               {/* Stokta olanları göster */}
@@ -720,7 +719,7 @@ const QrMenu = () => {
                   id="inStock"
                   checked={onlyInStock}
                   onChange={(e) => setOnlyInStock(e.target.checked)}
-                  className="accent-green-600"
+                  className="accent-[#D98A3D]"
                 />
                 <label htmlFor="inStock" className="text-sm text-gray-700">
                   Sadece stokta olanlar
@@ -734,14 +733,14 @@ const QrMenu = () => {
                   placeholder="Min fiyat"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full border p-2 rounded"
+                  className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
                 />
                 <input
                   type="number"
                   placeholder="Max fiyat"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-full border p-2 rounded"
+                  className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
                 />
               </div>
 
@@ -749,7 +748,7 @@ const QrMenu = () => {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
               >
                 <option value="">Kategori seç</option>
                 {Object.keys(groupedWithTeaFirst).map((category) => (
@@ -759,7 +758,7 @@ const QrMenu = () => {
 
               <button
                 onClick={() => setShowFilterModal(false)}
-                className="w-full bg-[#1a9c95] text-white py-2 rounded"
+                className="w-full bg-[#022B45] text-white py-2 rounded"
               >
                 Uygula
               </button>
@@ -772,8 +771,8 @@ const QrMenu = () => {
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-lg flex items-center justify-center px-4">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-6 relative">
-            <div className="flex justify-between items-center mb-4 border-b border-[#1a9c95]/20 pb-3">
-              <h3 className="text-xl font-bold text-[#1a9c95]">🛒 Sepet</h3>
+            <div className="flex justify-between items-center mb-4 border-b border-[#B8D7DD]/30 pb-3">
+              <h3 className="text-xl font-bold text-[#022B45]">🛒 Sepet</h3>
               <button
                 onClick={() => setIsCartOpen(false)}
                 className="text-gray-500 hover:text-gray-800"
@@ -791,7 +790,7 @@ const QrMenu = () => {
             ) : (
               <>
                 {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center border-b py-3">
+                  <div key={item.id} className="flex justify-between items-center border-b border-[#B8D7DD]/20 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-md overflow-hidden">
                         <img
@@ -806,11 +805,11 @@ const QrMenu = () => {
                       </div>
                       <div>
                         <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-gray-500">{item.price} ₺</p>
+                        <p className="text-sm text-[#D98A3D]">{item.price} ₺</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center border rounded-full overflow-hidden">
+                      <div className="flex items-center border rounded-full overflow-hidden border-[#B8D7DD]">
                         <button
                           className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200"
                           onClick={(e) => {
@@ -844,16 +843,16 @@ const QrMenu = () => {
                   </div>
                 ))}
 
-                <div className="mt-4 flex justify-between items-center py-3 border-t border-b">
+                <div className="mt-4 flex justify-between items-center py-3 border-t border-b border-[#B8D7DD]/20">
                   <span className="font-medium">Toplam</span>
-                  <span className="text-lg font-bold text-[#1a9c95]">
+                  <span className="text-lg font-bold text-[#D98A3D]">
                     {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} ₺
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-2 mt-6">
                   <button
-                    className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors"
+                    className="w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors"
                     onClick={() => {
                       const currentCart = [...cart];
                       navigate("/confirm", {

@@ -104,8 +104,8 @@ const FeedbackForm = () => {
                 onClick={() => handleRadioChange("firstVisit", "Evet")}
                 className={`flex-1 py-2 border rounded-full transition ${
                   formData.firstVisit === "Evet"
-                    ? "bg-[#1a9c95] text-white border-[#1a9c95]"
-                    : "border-gray-300 text-gray-700"
+                  ? "bg-[#022B45] text-white border-[#022B45]"
+                  : "border-gray-300 text-gray-700"
                 }`}
               >
                 Evet
@@ -195,7 +195,7 @@ const FeedbackForm = () => {
               name="comments"
               value={formData.comments}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#1a9c95] focus:border-[#1a9c95]"
+              className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
               rows="4"
             ></textarea>
           </div>
@@ -231,8 +231,8 @@ const FeedbackForm = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-[#1a9c95] text-white py-3 rounded-lg font-medium hover:bg-[#168981] transition-colors disabled:opacity-70"
-          >
+            className="w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors disabled:opacity-70"
+            >
             {isSubmitting ? "Gönderiliyor..." : "GÖNDER"}
           </button>
         </form>

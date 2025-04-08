@@ -106,7 +106,7 @@ const Dashboard = () => {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Çeşme Kahve Yönetim Paneli</h1>
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition shadow-sm">
+          <button className="px-4 py-2 bg-[#022B45] text-white rounded-lg text-sm hover:bg-[#022B45]/80 transition shadow-sm">
             Yardım
           </button>
           <button className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 transition shadow-sm">
@@ -117,7 +117,7 @@ const Dashboard = () => {
 
       {/* İstatistik Kartları */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#D98A3D]">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-gray-500 text-sm font-medium">Toplam Ürün</h3>
             <span className="text-3xl bg-blue-100 text-blue-800 p-2 rounded-lg">📦</span>
@@ -212,15 +212,15 @@ const Dashboard = () => {
           <div className="grid grid-cols-3 gap-4 mt-4">
             <div className="bg-gray-50 rounded-lg p-3">
               <h4 className="font-medium text-sm">En Çok Tıklanan</h4>
-              <p className="text-xl font-bold text-[#1a9c95]">Türk Kahvesi</p>
+              <p className="text-xl font-bold text-[#D98A3D]">Türk Kahvesi</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <h4 className="font-medium text-sm">Sayfa Kalma Süresi</h4>
-              <p className="text-xl font-bold text-[#1a9c95]">2.4 dk</p>
+              <p className="text-xl font-bold text-[#D98A3D]">2.4 dk</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <h4 className="font-medium text-sm">Dönüşüm Oranı</h4>
-              <p className="text-xl font-bold text-[#1a9c95]">%18.5</p>
+              <p className="text-xl font-bold text-[#D98A3D]">%18.5</p>
             </div>
           </div>
         </div>
