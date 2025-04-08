@@ -11,6 +11,7 @@ import ProductDetail from "./pages/ProductDetail"
 import { Toaster } from "react-hot-toast"
 import FeedbackForm from "./pages/FeedbackForm"
 import Heatmap from "./pages/HeatMap" // Yeni Isı Haritası bileşeni
+import ClarityAnalytics from "./components/ClarityAnalytics"
 
 // Kimlik doğrulama kontrolü için basit bir guard fonksiyonu
 const PrivateRoute = ({ children }) => {
@@ -21,6 +22,7 @@ const PrivateRoute = ({ children }) => {
 function App() {
   return (
     <BrowserRouter>
+      <ClarityAnalytics />
       <Toaster position="bottom-center" toastOptions={{ duration: 2000 }} />
       <Routes>
         {/* Ana sayfa - doğrudan menüye yönlendir */}

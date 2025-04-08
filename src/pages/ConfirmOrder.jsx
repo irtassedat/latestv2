@@ -36,24 +36,46 @@ const ConfirmOrder = () => {
   }, [cart, navigate])
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    if (isSubmitting) return
-    setIsSubmitting(true)
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    const { name, tableNumber } = formData
-    const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const { name, tableNumber } = formData;
+    const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     try {
-      await api.post("/orders", {
+      const response = await api.post("/orders", {
         name,
         tableNumber,
         totalPrice,
         items: cart
-      })
+      });
+
+      // Clarity olay izleme - sipariş tamamlandı
+      if (window.clarity) {
+        window.clarity("event", "order_complete", {
+          orderId: response?.data?.id || "unknown", // API'den ID gelmezse "unknown" kullan
+          customerName: name,
+          tableNumber: tableNumber,
+          totalAmount: totalPrice,
+          itemCount: cart.length,
+          products: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity
+          }))
+        });
+        
+        console.log("Clarity: Sipariş tamamlanma izlendi", {
+          total: totalPrice,
+          items: cart.length
+        });
+      }
 
       // Sepeti temizle (localStorage'dan da)
-      localStorage.removeItem("qr_cart")
+      localStorage.removeItem("qr_cart");
       
       // Başarı bildirimi
       toast.success("Siparişiniz başarıyla alındı!", {
@@ -65,21 +87,31 @@ const ConfirmOrder = () => {
           fontWeight: 'bold',
           padding: '16px',
         }
-      })
+      });
       
       // Kısa bir süre sonra ana sayfaya yönlendir
       setTimeout(() => {
-        navigate("/menu")
-      }, 2000)
+        navigate("/menu");
+      }, 2000);
     } catch (err) {
-      console.error("Sipariş gönderilirken hata oluştu:", err)
+      console.error("Sipariş gönderilirken hata oluştu:", err);
+      
+      // Clarity hata izleme
+      if (window.clarity) {
+        window.clarity("event", "order_error", {
+          error: err.message || "Unknown error",
+          customerName: formData.name,
+          tableNumber: formData.tableNumber
+        });
+      }
+      
       toast.error("Sipariş gönderilirken bir hata oluştu. Lütfen tekrar deneyin.", {
         duration: 3000,
         icon: '❌'
-      })
-      setIsSubmitting(false)
+      });
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
 

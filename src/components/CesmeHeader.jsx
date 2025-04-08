@@ -19,17 +19,46 @@ const CesmeHeader = () => {
     };
   }, [isMenuOpen]);
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const closeMenu = () => setIsMenuOpen(false);
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+    
+    // Clarity menü açma/kapama izleme
+    if (window.clarity) {
+      window.clarity("event", isMenuOpen ? "menu_close" : "menu_open");
+    }
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+    
+    // Clarity menü kapama izleme
+    if (window.clarity) {
+      window.clarity("event", "menu_close");
+    }
+  };
 
   const handleLogin = () => {
     navigate("/login");
     closeMenu();
+    
+    // Clarity login tıklama izleme
+    if (window.clarity) {
+      window.clarity("event", "login_click", {
+        fromHeader: true
+      });
+    }
   };
 
   const handleFeedback = () => {
     navigate("/feedback");
     closeMenu();
+    
+    // Clarity feedback tıklama izleme
+    if (window.clarity) {
+      window.clarity("event", "feedback_click", {
+        fromHeader: true
+      });
+    }
   };
 
   return (
@@ -37,7 +66,16 @@ const CesmeHeader = () => {
       {/* Header */}
       <header className="text-white p-4 shadow-md flex justify-between items-center bg-[#1a9c95] relative z-10">
         <div className="flex items-center">
-          <button onClick={() => navigate("/menu")} className="mr-3">
+        <button 
+            onClick={() => {
+              navigate("/menu");
+              // Clarity ana menüye dönme izleme
+              if (window.clarity) {
+                window.clarity("event", "home_click");
+              }
+            }} 
+            className="mr-3"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

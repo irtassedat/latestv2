@@ -42,16 +42,17 @@ const QrMenu = () => {
     // Buraya daha fazla promosyon eklenebilir
   ]
 
-  // Slider boyutlarını hesapla
+  // Slider boyutlarını hesapla - düzeltilmiş hali
   useEffect(() => {
     const calculateSliderHeight = () => {
       if (!sliderContainerRef.current) return;
 
+      // Normal container genişliği kullan (2 katı değil)
       const containerWidth = sliderContainerRef.current.offsetWidth;
-      // 1920x500 oranını koruyarak yüksekliği hesapla
-      const aspectRatio = 1920 / 500;
-      const calculatedHeight = containerWidth / aspectRatio;
-
+      
+      // 16:9 oranında yükseklik belirle - geleneksel slider oranı
+      const calculatedHeight = containerWidth * (9/16);
+      
       setSliderContainerHeight(calculatedHeight);
     }
 
@@ -235,6 +236,12 @@ const QrMenu = () => {
       })
       setActiveCategory(categoryName)
 
+      if (window.clarity) {
+        window.clarity("event", "category_click", {
+          categoryName: categoryName
+        });
+      }
+
       // Yatay scroll ile kategori butonunu görünür yap
       setTimeout(() => {
         const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
@@ -253,31 +260,44 @@ const QrMenu = () => {
   }
 
   const addToCart = (product) => {
-    const storedCart = JSON.parse(localStorage.getItem("qr_cart") || "[]")
-    const existingItem = storedCart.find((item) => item.id === product.id)
+    const existingCart = JSON.parse(localStorage.getItem("qr_cart") || "[]")
+    const existingItem = existingCart.find((item) => item.id === product.id)
 
-    let updatedCart
-    if (existingItem) {
-      updatedCart = storedCart.map((item) =>
+    const updatedCart = existingItem
+      ? existingCart.map((item) =>
         item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       )
-    } else {
-      updatedCart = [...storedCart, { ...product, quantity: 1 }]
-    }
+      : [...existingCart, { ...product, quantity: 1 }]
 
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
     setCart(updatedCart)
+    
     toast.success(`${product.name} sepete eklendi!`, {
-      duration: 2000,
+      duration: 3000,
       style: {
+        borderRadius: '10px',
         background: '#22c55e',
         color: '#fff',
         fontWeight: 'bold',
+        padding: '16px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       },
+      icon: '🛒',
     })
-  }
+    if (window.clarity) {
+      window.clarity("event", "add_to_cart", {
+        productId: product.id,
+        productName: product.name,
+        price: product.price,
+        quantity: 1,
+        cartTotal: updatedCart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      });
+      
+      console.log("Clarity: Sepete ekleme izlendi", product.name);
+    }
+  };
 
   const updateQuantity = (productId, delta) => {
     const updatedCart = cart
@@ -286,15 +306,38 @@ const QrMenu = () => {
           ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       );
-
+  
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
+    
+    // Clarity sepet güncelleme izleme
+    if (window.clarity) {
+      const product = cart.find(item => item.id === productId);
+      window.clarity("event", delta > 0 ? "cart_increase" : "cart_decrease", {
+        productId: productId,
+        productName: product?.name || "Unknown Product",
+        newQuantity: Math.max(1, product.quantity + delta),
+        delta: delta
+      });
+    }
   }
 
   const removeFromCart = (productId) => {
+    const product = cart.find(item => item.id === productId);
     const updatedCart = cart.filter((item) => item.id !== productId);
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
+    
+    // Clarity sepetten ürün çıkarma izleme
+    if (window.clarity && product) {
+      window.clarity("event", "remove_from_cart", {
+        productId: productId,
+        productName: product.name,
+        quantity: product.quantity,
+        price: product.price
+      });
+    }
+    
     toast.success("Ürün sepetten çıkarıldı", {
       icon: '🗑️',
       style: {
@@ -305,6 +348,14 @@ const QrMenu = () => {
   }
 
   const clearCart = () => {
+    // Clarity sepet temizleme izleme
+    if (window.clarity && cart.length > 0) {
+      window.clarity("event", "clear_cart", {
+        itemCount: cart.length,
+        totalValue: cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      });
+    }
+    
     setCart([]);
     localStorage.removeItem("qr_cart");
     setIsCartOpen(false);
@@ -346,15 +397,35 @@ const QrMenu = () => {
     return () => window.removeEventListener("focus", syncCart)
   }, [])
 
-  // Resimlerin yüklendiğini kontrol etmek için
+  // Resimlerin yüklendiğini kontrol etmek için - düzeltilmiş hali
   const handleImageLoad = (e) => {
-    // Görsel yüklendiğinde boyutu güncelleyebiliriz
     if (sliderContainerRef.current && e.target.naturalWidth) {
-      const imgAspectRatio = e.target.naturalWidth / e.target.naturalHeight;
       const containerWidth = sliderContainerRef.current.offsetWidth;
-      setSliderContainerHeight(containerWidth / imgAspectRatio);
+      const calculatedHeight = containerWidth * (9/16);
+      setSliderContainerHeight(calculatedHeight);
     }
   }
+
+  const handleProductClick = (product) => {
+    // Ürün detay sayfasına yönlendir
+    navigate(`/product/${product.id}`, { state: { product } });
+    
+    // Clarity olay izleme - ürün görüntüleme
+    if (window.clarity) {
+      // Ürün adını kullanıcı özelliği olarak ayarla
+      window.clarity("set", "product_viewed", product.name);
+      
+      // Özel ürün tıklama olayı
+      window.clarity("event", "product_click", {
+        productId: product.id,
+        productName: product.name,
+        category: product.category_name || "Kategori Yok",
+        price: product.price
+      });
+      
+      console.log("Clarity: Ürün tıklama izlendi", product.name);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 pt-16" ref={containerRef}>
@@ -413,21 +484,20 @@ const QrMenu = () => {
       )}
 
       <div className="px-4 py-4">
-        {/* Promosyon Slider - İyileştirilmiş */}
+        {/* Promosyon Slider - Düzeltilmiş hali */}
         <div className="mb-8">
           <div
             ref={sliderContainerRef}
-            className="w-full overflow-hidden relative bg-transparent"
+            className="w-full overflow-hidden relative bg-transparent rounded-lg"
             style={{
               height: `${sliderContainerHeight}px`,
-              backgroundColor: 'rgba(0, 0, 0, 0.05)' // Şeffaf gri arkaplan
+              backgroundColor: 'rgba(0, 0, 0, 0.05)'
             }}
           >
             {promotionSlides.map((slide, index) => (
               <div
                 key={slide.id}
-                className={`absolute inset-0 flex items-center justify-center ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                  }`}
+                className={`absolute inset-0 flex items-center justify-center ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 style={{
                   transition: 'opacity 0.5s ease-in-out'
                 }}
@@ -435,7 +505,7 @@ const QrMenu = () => {
                 <img
                   src={slide.image}
                   alt={`Promosyon ${index + 1}`}
-                  className="max-w-full max-h-full object-contain"
+                  className="w-full h-full object-cover"
                   onLoad={handleImageLoad}
                   onError={(e) => {
                     console.error("Görsel yüklenemedi:", e);
@@ -560,7 +630,7 @@ const QrMenu = () => {
                 {items.map((p) => (
                   <div
                     key={p.id}
-                    onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
+                    onClick={() => handleProductClick(p)}
                     className="w-full bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition cursor-pointer relative group"
                   >
                     {/* Ürün Görseli - Şimdi solda */}

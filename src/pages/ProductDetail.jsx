@@ -122,6 +122,19 @@ const ProductDetail = () => {
       },
       icon: '🛒',
     })
+    
+    // Clarity olay izleme - ürün detay sayfasından sepete ekleme
+    if (window.clarity) {
+      window.clarity("event", "detail_add_to_cart", {
+        productId: product.id,
+        productName: product.name,
+        price: product.price,
+        quantity: 1,
+        fromPage: "product_detail"
+      });
+      
+      console.log("Clarity: Ürün detayından sepete ekleme izlendi", product.name);
+    }
   }
 
   const toggleFeatureDetails = (featureId) => {
@@ -147,6 +160,27 @@ const ProductDetail = () => {
     )
   }
 
+  useEffect(() => {
+    if (product) {
+      // Clarity olay izleme - ürün detayı görüntüleme
+      if (window.clarity) {
+        window.clarity("set", "product_detail_viewed", product.name);
+        window.clarity("event", "product_detail_view", {
+          productId: product.id,
+          productName: product.name,
+          category: product.category_name || "Kategori Yok",
+          price: product.price,
+          description: product.description || ""
+        });
+        
+        console.log("Clarity: Ürün detay görüntüleme izlendi", product.name);
+      }
+    }
+  }, [product]); // product değiştiğinde tetikle
+
+
+
+  
   return (
     <motion.div
       initial={{ opacity: 0 }}

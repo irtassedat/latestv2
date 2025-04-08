@@ -14,9 +14,9 @@ const determineBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Fallback based on environment
+  // Fallback based on environment - PORT'U 5050 OLARAK GÜNCELLEDIK
   if (import.meta.env.MODE === 'development') {
-    return 'http://localhost:5050'; // Port 5050 kullanılıyor
+    return 'http://localhost:5050'; // 5000 yerine 5050 kullanın
   }
   
   // Production fallback
@@ -31,8 +31,10 @@ const api = axios.create({
 
 // Request interceptor to fix API path issues
 api.interceptors.request.use(config => {
-  // Burada kritik değişiklik: her istekte /api prefix'i olduğundan emin oluyoruz
-  if (!config.url.startsWith('/api/') && !config.url.startsWith('api/')) {
+  // Check if we need to add /api prefix for production
+  if (import.meta.env.MODE === 'production' && 
+      !config.url.startsWith('/api/') && 
+      !config.url.startsWith('api/')) {
     config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
   }
   
@@ -42,10 +44,11 @@ api.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// Response interceptor
+// Response interceptor for better error handling
 api.interceptors.response.use(
   response => response,
   error => {
+    // Log detailed error information
     console.error("API Error:", {
       endpoint: error.config?.url,
       method: error.config?.method,
