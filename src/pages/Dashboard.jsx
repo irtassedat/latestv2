@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react" 
+import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import api from "../lib/axios"
 
@@ -19,7 +19,7 @@ const Dashboard = () => {
         // Gerçek bir API çağrısı yapılabilir veya mock data kullanılabilir
         // const response = await api.get("/stats")
         // setStats(response.data)
-        
+
         // Şu an için örnek data kullanıyoruz
         setStats({
           totalProducts: 124,
@@ -43,51 +43,51 @@ const Dashboard = () => {
 
   // Admin paneli menü öğeleri
   const menuItems = [
-    { 
-      title: "Ürünler", 
-      icon: "📦", 
-      path: "/admin/products", 
-      color: "bg-blue-500", 
+    {
+      title: "Ürünler",
+      icon: "📦",
+      path: "/admin/products",
+      color: "bg-blue-500",
       description: "Tüm ürünleri yönetin",
       features: ["Excel/PDF export", "Toplu düzenleme", "Kategori yönetimi"]
     },
-    { 
-      title: "Şube Ürünleri", 
-      icon: "🏪", 
-      path: "/admin/branch-products", 
-      color: "bg-green-500", 
+    {
+      title: "Şube Ürünleri",
+      icon: "🏪",
+      path: "/admin/branch-products",
+      color: "bg-green-500",
       description: "Şubelere özel ürünler",
       features: ["Stok takibi", "Görünürlük kontrolü", "Fiyat güncellemeleri"]
     },
-    { 
-      title: "Siparişler", 
-      icon: "🧾", 
-      path: "/admin/orders", 
-      color: "bg-amber-500", 
+    {
+      title: "Siparişler",
+      icon: "🧾",
+      path: "/admin/orders",
+      color: "bg-amber-500",
       description: "Tüm siparişleri görüntüleyin",
       features: ["Sipariş takibi", "Durum güncelleme", "Excel/PDF export"]
     },
-    { 
-      title: "QR Menü", 
-      icon: "📱", 
-      path: "/menu", 
-      color: "bg-purple-500", 
+    {
+      title: "QR Menü",
+      icon: "📱",
+      path: "/menu",
+      color: "bg-purple-500",
       description: "QR Menü önizleme",
       features: ["Müşteri görünümü", "Mobil uyumluluk", "Canlı test"]
     },
-    { 
-      title: "Isı Haritası", 
-      icon: "🔥", 
-      path: "/admin/heatmap", 
-      color: "bg-red-500", 
+    {
+      title: "Isı Haritası",
+      icon: "🔥",
+      path: "/admin/heatmap",
+      color: "bg-red-500",
       description: "Kullanıcı davranışları analizi",
       features: ["Ürün popülaritesi", "Sayfa ziyaret analizi", "Tıklama verileri"]
     },
-    { 
-      title: "Analitik", 
-      icon: "📊", 
-      path: "/admin/analytics", 
-      color: "bg-indigo-500", 
+    {
+      title: "Analitik",
+      icon: "📊",
+      path: "/admin/analytics",
+      color: "bg-indigo-500",
       description: "Detaylı raporlar ve analizler",
       features: ["Satış grafikleri", "Trend analizi", "Performans raporu"]
     },
@@ -125,7 +125,7 @@ const Dashboard = () => {
           <p className="text-3xl font-bold text-gray-800">{stats.totalProducts}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm şubeler</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-gray-500 text-sm font-medium">Şube Sayısı</h3>
@@ -134,7 +134,7 @@ const Dashboard = () => {
           <p className="text-3xl font-bold text-gray-800">{stats.totalBranches}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm lokasyonlar</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-gray-500 text-sm font-medium">Toplam Sipariş</h3>
@@ -143,7 +143,7 @@ const Dashboard = () => {
           <p className="text-3xl font-bold text-gray-800">{stats.totalOrders}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm zamanlar</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-gray-500 text-sm font-medium">Kategori Sayısı</h3>
@@ -158,8 +158,8 @@ const Dashboard = () => {
       <h2 className="text-xl font-semibold text-gray-800 mb-4">Yönetim Araçları</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {menuItems.map((item, index) => (
-          <Link 
-            key={index} 
+          <Link
+            key={index}
             to={item.path}
             className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition border border-gray-100 relative overflow-hidden group"
           >
@@ -169,7 +169,7 @@ const Dashboard = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">{item.title}</h3>
             <p className="text-sm text-gray-500 mb-4">{item.description}</p>
-            
+
             {/* Özellik listesi */}
             <div className="space-y-1 mt-3">
               {item.features.map((feature, idx) => (
@@ -193,12 +193,12 @@ const Dashboard = () => {
         </div>
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="relative">
-            <img 
-              src="/analytics/heatmap-preview.jpg" 
+            <img
+              src="/analytics/heatmap-preview.jpg"
               alt="Isı Haritası Önizleme"
               className="w-full rounded-lg"
               onError={(e) => {
-                e.target.src = "https://via.placeholder.com/800x400?text=Isı+Haritası+Önizleme"
+                e.target.src = "/uploads/guncellenecek.jpg" // Projenin public/uploads içine bu resmi koyman yeterli
                 e.target.onerror = null
               }}
             />
@@ -268,8 +268,8 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Hızlı İşlemler</h2>
             <div className="space-y-3">
-              <button 
-                onClick={() => navigate("/admin/products")} 
+              <button
+                onClick={() => navigate("/admin/products")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -278,9 +278,9 @@ const Dashboard = () => {
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
-              
-              <button 
-                onClick={() => navigate("/admin/branch-products")} 
+
+              <button
+                onClick={() => navigate("/admin/branch-products")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -289,9 +289,9 @@ const Dashboard = () => {
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
-              
-              <button 
-                onClick={() => navigate("/admin/orders")} 
+
+              <button
+                onClick={() => navigate("/admin/orders")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -300,9 +300,9 @@ const Dashboard = () => {
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
-              
-              <button 
-                onClick={() => navigate("/menu")} 
+
+              <button
+                onClick={() => navigate("/menu")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -311,9 +311,9 @@ const Dashboard = () => {
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
-              
-              <button 
-                onClick={() => navigate("/admin/heatmap")} 
+
+              <button
+                onClick={() => navigate("/admin/heatmap")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
@@ -324,7 +324,7 @@ const Dashboard = () => {
               </button>
             </div>
           </div>
-          
+
           {/* Sistem Bilgisi */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Sistem Bilgisi</h2>

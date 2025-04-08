@@ -14,13 +14,13 @@ const determineBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Fallback based on environment - PORT'U 5050 OLARAK GÜNCELLEDIK
+  // Fallback based on environment
   if (import.meta.env.MODE === 'development') {
-    return 'http://localhost:5050'; // 5000 yerine 5050 kullanın
+    return 'http://localhost:5050'; // Local development server
   }
   
-  // Production fallback
-  return 'https://qr.405found.tr';
+  // Production fallback - remove the /api suffix if that's causing the issue
+  return 'https://qr.405found.tr'; // Try without /api prefix
 };
 
 const api = axios.create({
@@ -32,11 +32,9 @@ const api = axios.create({
 // Request interceptor to fix API path issues
 api.interceptors.request.use(config => {
   // Check if we need to add /api prefix for production
-  if (import.meta.env.MODE === 'production' && 
-      !config.url.startsWith('/api/') && 
-      !config.url.startsWith('api/')) {
+  if (!config.url.startsWith('/api/') && !config.url.startsWith('api/')) {
     config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
-  }
+  }  
   
   console.log(`Making ${config.method.toUpperCase()} request to: ${config.baseURL}${config.url}`);
   return config;
