@@ -247,7 +247,7 @@ const QrMenu = () => {
         const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
         const fixedNavContainer = document.getElementById('fixed-category-nav')
 
-        if (fixedCatButton && fixedNavContainer && showCategoryHeader) {
+        if (fixedCatButton && fixedNavContainer) {
           // Butonu görünür alana getir
           fixedCatButton.scrollIntoView({
             behavior: "smooth",
@@ -442,11 +442,12 @@ const QrMenu = () => {
             <div id="fixed-category-nav" className="flex py-1 px-2 gap-2">
               {Object.keys(groupedWithTeaFirst).map((cat) => (
                 <button
+                  id={`fixed-cat-${cat}`}
                   key={cat}
                   onClick={() => handleCategoryClick(cat)}
                   className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
-                  ${activeCategory === cat
-                      ? 'bg-white border-[#022B45] text-[#022B45]'
+            ${activeCategory === cat
+                      ? 'bg-white border-white text-[#022B45]'
                       : 'bg-[#022B45] text-white border-[#022B45] hover:opacity-90'
                     }`}
                 >
@@ -522,7 +523,7 @@ const QrMenu = () => {
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-[#1a9c95] w-4' : 'bg-gray-300'
+                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-white w-4' : 'bg-white/50'
                     }`}
                   aria-label={`Slayt ${index + 1}`}
                 />
@@ -595,7 +596,7 @@ const QrMenu = () => {
                 onClick={() => handleCategoryClick(cat)}
                 className="snap-start flex flex-col items-center cursor-pointer"
               >
-                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-[#1a9c95]" : ""
+                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-white" : ""
                   }`}>
                   <img
                     src={`/category/${toSlug(cat)}.jpg`}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube, FaTimes } from "react-icons/fa";
 
 const CesmeHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -21,8 +22,6 @@ const CesmeHeader = () => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
-    
-    // Clarity menü açma/kapama izleme
     if (window.clarity) {
       window.clarity("event", isMenuOpen ? "menu_close" : "menu_open");
     }
@@ -30,8 +29,6 @@ const CesmeHeader = () => {
 
   const closeMenu = () => {
     setIsMenuOpen(false);
-    
-    // Clarity menü kapama izleme
     if (window.clarity) {
       window.clarity("event", "menu_close");
     }
@@ -40,132 +37,223 @@ const CesmeHeader = () => {
   const handleLogin = () => {
     navigate("/login");
     closeMenu();
-    
-    // Clarity login tıklama izleme
     if (window.clarity) {
-      window.clarity("event", "login_click", {
-        fromHeader: true
-      });
+      window.clarity("event", "login_click", { fromHeader: true });
     }
   };
 
   const handleFeedback = () => {
     navigate("/feedback");
     closeMenu();
-    
-    // Clarity feedback tıklama izleme
     if (window.clarity) {
-      window.clarity("event", "feedback_click", {
-        fromHeader: true
-      });
+      window.clarity("event", "feedback_click", { fromHeader: true });
     }
   };
 
   return (
     <>
-      {/* Header */}
+      {/* Üst Header */}
       <header className="text-white p-4 shadow-md flex justify-between items-center bg-[#022B45] relative z-10">
         <div className="flex items-center">
-        <button 
-            onClick={() => {
-              navigate("/menu");
-              // Clarity ana menüye dönme izleme
-              if (window.clarity) {
-                window.clarity("event", "home_click");
-              }
-            }} 
-            className="mr-3"
-          >
+          <button onClick={() => navigate("/menu")} className="mr-3">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <h1 className="text-xl font-medium">Çeşme Kahve</h1>
         </div>
-        <button onClick={toggleMenu} className="p-1">
+        <button onClick={toggleMenu}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
       </header>
 
-      {/* Menü Overlay ve İçerik */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 flex z-50" style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
-          {/* Sol Menü - Tamamen opak ve tam ekran yüksekliği */}
-          <div
-            className="w-[80%] h-full bg-white flex flex-col shadow-xl animate-slideInLeft"
+      {/* Menü Portal - React Portal kullanmadan benzer bir etki yaratıyoruz */}
+      {isMenuOpen && createPortal()}
+    </>
+  );
+
+  // Menü portalı oluşturan fonksiyon
+  function createPortal() {
+    return (
+      <div 
+        id="cesme-menu-portal" 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 1000000,
+          pointerEvents: 'auto',
+        }}
+      >
+        {/* Tüm Ekran Arkaplan - Blur ve Karartma */}
+        <div 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(5px)',
+          }}
+        />
+        
+        {/* Menü Çerçevesi */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+          }}
+        >
+          {/* Sol Menü Paneli */}
+          <div 
             style={{
-              backgroundColor: "#fff",
-              boxShadow: "4px 0 10px rgba(0, 0, 0, 0.2)"
+              width: '80%',
+              height: '100%',
+              backgroundColor: 'white',
+              boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              animation: 'slideIn 0.3s ease-out forwards',
             }}
           >
-            {/* Menü Başlığı */}
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white">
-              <span className="text-gray-800 font-medium text-xl">Menü</span>
-              <button onClick={closeMenu} className="text-gray-600 p-2 rounded-full hover:bg-gray-100">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+            {/* Menü İçeriği */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Kapat Butonu */}
+              <button
+                onClick={closeMenu}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#555',
+                }}
+              >
+                <FaTimes style={{ width: '20px', height: '20px' }} />
               </button>
-            </div>
-
-            {/* Menü İçerik */}
-            <div className="p-6 flex-1 bg-white">
-              <div className="flex flex-col space-y-5">
-                <div className="text-gray-800 hover:bg-gray-100 cursor-pointer p-4 rounded-lg font-medium flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2" />
-                  </svg>
-                  Dil (TR)
+              
+              {/* Sosyal Medya */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '24px',
+                marginTop: '24px',
+                marginBottom: '40px',
+                color: '#022B45',
+                fontSize: '24px',
+              }}>
+                <FaInstagram style={{ cursor: 'pointer' }} />
+                <FaFacebookF style={{ cursor: 'pointer' }} />
+                <FaTwitter style={{ cursor: 'pointer' }} />
+                <FaYoutube style={{ cursor: 'pointer' }} />
+              </div>
+              
+              {/* Menü Öğeleri */}
+              <div style={{ flexGrow: 1 }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '24px',
+                  color: '#022B45',
+                  fontSize: '18px',
+                  fontWeight: '500',
+                }}>
+                  <button 
+                    onClick={() => { navigate("/dil"); closeMenu(); }}
+                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    🌐 Dil (TR)
+                  </button>
+                  <button 
+                    onClick={() => { navigate("/rezervasyon"); closeMenu(); }}
+                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    📅 Rezervasyon Oluştur
+                  </button>
+                  <button 
+                    onClick={handleFeedback}
+                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    💬 Geri Bildirim Ver
+                  </button>
                 </div>
-
-                <div
-                  className="text-gray-800 hover:bg-gray-100 cursor-pointer p-4 rounded-lg font-medium flex items-center"
-                  onClick={handleFeedback}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                  </svg>
-                  Geri Bildirim Ver
-                </div>
-
+              </div>
+              
+              {/* Login Butonu */}
+              <div style={{ 
+                marginTop: 'auto', 
+                paddingTop: '24px', 
+                borderTop: '1px solid #eee',
+              }}>
                 <button
                   onClick={handleLogin}
-                  className="flex items-center justify-center w-full bg-[#022B45] text-white py-4 px-4 rounded-lg hover:bg-[#022B45]/80 mt-4 font-medium"
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#022B45',
+                    color: 'white',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontWeight: '500',
+                    marginTop: '16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg style={{ width: '20px', height: '20px' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
                   Giriş yap
                 </button>
               </div>
-            </div>
-
-            {/* Alt Bilgi - Sayfanın en altına yapıştırılmış */}
-            <div className="p-5 border-t border-gray-200 text-center text-xs text-gray-500 bg-white">
-              © 2025 Çeşme Kahve<br />
-              Tüm Hakları Saklıdır
+              
+              {/* Telif Hakkı */}
+              <div style={{
+                marginTop: '24px',
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#888',
+              }}>
+                © 2025 Çeşme Kahve<br />
+                Tüm Hakları Saklıdır
+              </div>
             </div>
           </div>
-
-          {/* Sağ taraftaki kapatma alanı */}
-          <div className="flex-1" onClick={closeMenu}></div>
+          
+          {/* Sağ Kapama Alanı */}
+          <div 
+            style={{ flex: 1 }}
+            onClick={closeMenu}
+          />
         </div>
-      )}
-
-      {/* Slide in animasyonu */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes slideInLeft {
-          from { transform: translateX(-100%); }
-          to { transform: translateX(0); }
-        }
-        .animate-slideInLeft {
-          animation: slideInLeft 0.3s ease forwards;
-        }
-      `}} />
-    </>
-  );
+      </div>
+    );
+  }
 };
+
+// CSS Animasyonu
+document.head.insertAdjacentHTML('beforeend', `
+  <style>
+    @keyframes slideIn {
+      0% { transform: translateX(-100%); opacity: 0; }
+      100% { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+`);
 
 export default CesmeHeader;
