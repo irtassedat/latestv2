@@ -179,7 +179,7 @@ const ProductDetail = () => {
   }, [product]); // product değiştiğinde tetikle
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-28">
+    <div className="bg-gray-50 min-h-screen pb-8">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -392,39 +392,39 @@ const ProductDetail = () => {
                 )}
               </AnimatePresence>
             </div>
+            
+            {/* Benzer Ürünler - Normal akış içinde */}
+            {similarProducts.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold mb-4">⭐ Benzer Ürünler</h3>
+                <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                  {similarProducts.map(item => (
+                    <div
+                      key={item.id}
+                      onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
+                      className="min-w-[110px] max-w-[110px] rounded-lg overflow-hidden shadow-sm bg-white border border-gray-100 cursor-pointer hover:shadow-md transition-shadow flex flex-col"
+                    >
+                      {/* Görsel Kapsayıcı */}
+                      <div className="w-full h-[80px] overflow-hidden bg-gray-50">
+                        <img
+                          src={item.image_url || "/uploads/guncellenecek.jpg"}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          style={{ objectPosition: 'center' }}
+                        />
+                      </div>
+                      <div className="p-2 flex-1 flex flex-col justify-between">
+                        <h4 className="font-medium text-xs text-gray-900 truncate">{item.name}</h4>
+                        <p className="text-[#D98A3D] font-bold text-xs mt-1">{item.price} ₺</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
-
-      {/* Benzer Ürünler - Ana içerikten tamamen bağımsız, sabit footer */}
-      {similarProducts.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] pt-3 pb-3 px-4 z-30">
-          <h3 className="text-lg font-semibold mb-2">⭐ Benzer Ürünler</h3>
-          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-            {similarProducts.map(item => (
-              <div
-                key={item.id}
-                onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
-                className="min-w-[110px] max-w-[110px] rounded-lg overflow-hidden shadow-sm bg-white border border-gray-100 cursor-pointer hover:shadow-md transition-shadow flex flex-col"
-              >
-                {/* Görsel Kapsayıcı */}
-                <div className="w-full h-[80px] overflow-hidden bg-gray-50">
-                  <img
-                    src={item.image_url || "/uploads/guncellenecek.jpg"}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                    style={{ objectPosition: 'center' }}
-                  />
-                </div>
-                <div className="p-2 flex-1 flex flex-col justify-between">
-                  <h4 className="font-medium text-xs text-gray-900 truncate">{item.name}</h4>
-                  <p className="text-[#D98A3D] font-bold text-xs mt-1">{item.price} ₺</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Tam Ekran Görüntü İçin CSS Düzenlemeleri */}
       <style dangerouslySetInnerHTML={{
