@@ -428,7 +428,7 @@ const QrMenu = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-16" ref={containerRef}>
+    <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
       <div
         className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'
           }`}
