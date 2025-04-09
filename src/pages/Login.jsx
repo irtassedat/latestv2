@@ -1,29 +1,51 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
 import CesmeHeader from "../components/CesmeHeader"
+import toast from "react-hot-toast"
 
 const Login = () => {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+  
+  const { login, currentUser } = useAuth()
   const navigate = useNavigate()
+
+  // Kullanıcı zaten giriş yapmışsa yönlendir
+  useEffect(() => {
+    if (currentUser) {
+      navigate("/admin");
+    }
+  }, [currentUser, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    
+    if (!username || !password) {
+      setError("Lütfen kullanıcı adı ve şifre girin");
+      return;
+    }
+    
     setIsLoading(true)
     setError(null)
 
-    // Mock authentication
-    setTimeout(() => {
-      if (email === "admin@admin.com" && password === "123123") {
-        localStorage.setItem("token", "mock-token-123")
-        navigate("/admin") // Admin paneline yönlendir
-      } else {
-        setError("Geçersiz giriş bilgileri!")
-        setIsLoading(false)
-      }
-    }, 800)
+    try {
+      // useAuth hook'undan gelen login fonksiyonunu kullan
+      const user = await login(username, password);
+      
+      toast.success(`Hoş geldiniz, ${user.username}!`, {
+        duration: 3000,
+        icon: '👋',
+      });
+      
+      // Kullanıcı rolüne göre yönlendirme
+      navigate("/admin");
+    } catch (err) {
+      setError(err.message);
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -48,14 +70,14 @@ const Login = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                E-posta
+                Kullanıcı Adı
               </label>
               <input
-                type="email"
-                placeholder="admin@admin.com"
+                type="text"
+                placeholder="Kullanıcı adınız"
                 className="w-full border border-gray-300 px-4 py-3 rounded-lg focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD] outline-none transition"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
@@ -101,9 +123,7 @@ const Login = () => {
             </button>
 
             <div className="text-center text-sm text-gray-500 mt-4">
-              <p>Demo Giriş Bilgileri:</p>
-              <p>E-posta: admin@admin.com</p>
-              <p>Şifre: 123123</p>
+              <p>Giriş bilgilerinizi şube yetkilisinden alabilirsiniz</p>
             </div>
           </form>
         </div>

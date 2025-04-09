@@ -7,9 +7,11 @@ import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import ReactPaginate from "react-paginate";
+import { useAuth } from "../contexts/AuthContext";
 
 const BranchProductManager = () => {
   const { id: paramId } = useParams();
+  const { currentUser, isSuperAdmin } = useAuth(); // Auth context'ten kullanıcı ve rol bilgisini al
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState(paramId || "");
   const [products, setProducts] = useState([]);
@@ -53,12 +55,19 @@ const BranchProductManager = () => {
   // Şubeleri getir
   const fetchBranches = async () => {
     try {
-      const response = await api.get("/branches");
+      const response = await api.get("/api/branches");
       setBranches(response.data);
 
-      // Eğer URL'den gelen bir şube ID'si yoksa ve şubeler varsa ilk şubeyi seç
+      // Eğer URL'den gelen bir şube ID'si yoksa ve şubeler varsa
       if (!paramId && response.data.length > 0) {
-        setSelectedBranchId(response.data[0].id);
+        // Şube yöneticisi ise kendi şubesini otomatik seç
+        if (!isSuperAdmin && currentUser?.branch_id) {
+          setSelectedBranchId(currentUser.branch_id.toString());
+        }
+        // Super admin ise ilk şubeyi seç
+        else if (isSuperAdmin) {
+          setSelectedBranchId(response.data[0].id.toString());
+        }
       }
     } catch (error) {
       console.error("Şubeler yüklenirken hata:", error);
@@ -69,7 +78,7 @@ const BranchProductManager = () => {
   // Kategorileri getir
   const fetchCategories = async () => {
     try {
-      const response = await api.get("/categories");
+      const response = await api.get("/api/categories");
       setCategories(response.data);
     } catch (error) {
       console.error("Kategoriler yüklenirken hata:", error);
@@ -83,7 +92,7 @@ const BranchProductManager = () => {
 
     setLoading(true);
     try {
-      const response = await api.get(`/products/branch/${branchId}`);
+      const response = await api.get(`/api/products/branch/${branchId}`);
       setProducts(response.data);
     } catch (error) {
       console.error("Ürünler yüklenirken hata:", error);
@@ -99,10 +108,15 @@ const BranchProductManager = () => {
   }, []);
 
   useEffect(() => {
+    // URL'den bir şube ID'si geldiyse veya bir şube seçildiyse
     if (selectedBranchId) {
       fetchBranchProducts(selectedBranchId);
     }
-  }, [selectedBranchId]);
+    // Şube yöneticisiyse ve hiçbir şube seçilmediyse kendi şubesini seç
+    else if (!isSuperAdmin && currentUser?.branch_id) {
+      setSelectedBranchId(currentUser.branch_id.toString());
+    }
+  }, [selectedBranchId, currentUser, isSuperAdmin]);
 
   // Şube değiştiğinde URL güncelle
   const handleBranchChange = (e) => {
@@ -121,7 +135,7 @@ const BranchProductManager = () => {
       // Ürün görünürlüğünü tersine çevir
       const newVisibility = !product.is_visible;
 
-      await api.patch("/products/branch-product", {
+      await api.patch("/api/products/branch-product", {
         branch_id: selectedBranchId,
         product_id: product.id,
         is_visible: newVisibility
@@ -145,7 +159,7 @@ const BranchProductManager = () => {
       // Sayı olarak çevir ve negatif olmamasını sağla
       const stockCount = Math.max(0, parseInt(newStock) || 0);
 
-      await api.patch("/products/branch-product", {
+      await api.patch("/api/products/branch-product", {
         branch_id: selectedBranchId,
         product_id: product.id,
         stock_count: stockCount
@@ -165,12 +179,18 @@ const BranchProductManager = () => {
 
   // Ürün silme
   const handleDelete = async (product) => {
+    // Super Admin değilse engelle
+    if (!isSuperAdmin) {
+      toast.error("Bu işlem için yetkiniz bulunmamaktadır");
+      return;
+    }
+
     if (!window.confirm(`${product.name} ürününü silmek istediğinize emin misiniz?`)) {
       return;
     }
 
     try {
-      await api.delete(`/products/${product.id}`);
+      await api.delete(`/api/products/${product.id}`);
 
       // UI'dan ürünü kaldır
       setProducts(products.filter(p => p.id !== product.id));
@@ -199,6 +219,12 @@ const BranchProductManager = () => {
 
   // Yeni ürün eklemek için formu hazırla
   const handleAdd = () => {
+    // Super Admin değilse engelle
+    if (!isSuperAdmin) {
+      toast.error("Bu işlem için yetkiniz bulunmamaktadır");
+      return;
+    }
+
     setEditingProduct(null);
     setForm({
       name: "",
@@ -229,18 +255,27 @@ const BranchProductManager = () => {
     try {
       let response;
 
-      if (editingProduct) {
-        // Var olan ürünü güncelle
-        response = await api.put(`/products/${editingProduct.id}`, {
-          name: form.name,
-          description: form.description,
-          image_url: form.image_url,
-          price: parseFloat(form.price),
-          category_id: form.category_id
-        });
+      // Super Admin değilse ve yeni ürün eklemeye çalışıyorsa engelle
+      if (!editingProduct && !isSuperAdmin) {
+        toast.error("Yeni ürün ekleme yetkiniz bulunmamaktadır");
+        return;
+      }
 
-        // Şube özelliklerini güncelle
-        await api.patch("/products/branch-product", {
+      if (editingProduct) {
+        // Var olan ürünü güncelle - Super Admin değilse sadece belirli alanları güncelleyebilir
+        if (isSuperAdmin) {
+          // Super Admin tüm özellikleri güncelleyebilir
+          response = await api.put(`/api/products/${editingProduct.id}`, {
+            name: form.name,
+            description: form.description,
+            image_url: form.image_url,
+            price: parseFloat(form.price),
+            category_id: form.category_id
+          });
+        }
+
+        // Şube özelliklerini güncelle - Hem Super Admin hem de Şube Yöneticisi yapabilir
+        await api.patch("/api/products/branch-product", {
           branch_id: selectedBranchId,
           product_id: editingProduct.id,
           is_visible: form.is_visible,
@@ -249,8 +284,8 @@ const BranchProductManager = () => {
 
         toast.success(`${form.name} başarıyla güncellendi`);
       } else {
-        // Yeni ürün ekle
-        response = await api.post("/products", {
+        // Yeni ürün ekle - Sadece Super Admin yapabilir
+        response = await api.post("/api/products", {
           name: form.name,
           description: form.description,
           image_url: form.image_url,
@@ -259,7 +294,7 @@ const BranchProductManager = () => {
         });
 
         // Yeni ürün için şube özelliklerini ayarla
-        await api.patch("/products/branch-product", {
+        await api.patch("/api/products/branch-product", {
           branch_id: selectedBranchId,
           product_id: response.data.id,
           is_visible: form.is_visible,
@@ -315,6 +350,15 @@ const BranchProductManager = () => {
 
   // Excel'den içe aktar
   const handleImportExcel = async (e) => {
+    // Super Admin değilse engelle
+    if (!isSuperAdmin) {
+      toast.error("Bu işlem için yetkiniz bulunmamaktadır");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -337,7 +381,7 @@ const BranchProductManager = () => {
       }));
 
       // Backend'e gönder
-      const response = await api.post("/products/bulk", { products });
+      const response = await api.post("/api/products/bulk", { products });
 
       // Başarı mesajı göster
       toast.success(`İçe aktarma tamamlandı: ${response.data.stats.inserted} ürün eklendi, ${response.data.stats.skipped} atlandı`);
@@ -385,20 +429,27 @@ const BranchProductManager = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <h1 className="text-2xl font-bold text-gray-800">Şube Ürün Yönetimi</h1>
 
-          {/* Şube Seçici */}
+          {/* Şube Seçici - Sadece süper admin şube seçebilir */}
           <div className="w-full md:w-auto">
-            <select
-              value={selectedBranchId}
-              onChange={handleBranchChange}
-              className="w-full md:w-64 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Şube Seçin</option>
-              {branches.map(branch => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            {isSuperAdmin ? (
+              <select
+                value={selectedBranchId}
+                onChange={handleBranchChange}
+                className="w-full md:w-64 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Şube Seçin</option>
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              // Şube yöneticisi ise kendi şubesinin adını göster
+              <div className="text-lg font-medium text-gray-700 bg-gray-50 px-4 py-2 rounded-lg">
+                Şube: {branches.find(b => b.id.toString() === selectedBranchId.toString())?.name || "Yükleniyor..."}
+              </div>
+            )}
           </div>
         </div>
 
@@ -436,22 +487,29 @@ const BranchProductManager = () => {
 
               {/* İşlem Butonları */}
               <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleAdd}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <FiPlus size={18} />
-                  <span>Yeni Ürün</span>
-                </button>
+                {/* Yeni Ürün - Sadece Super Admin */}
+                {isSuperAdmin && (
+                  <button
+                    onClick={handleAdd}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <FiPlus size={18} />
+                    <span>Yeni Ürün</span>
+                  </button>
+                )}
 
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  <FiUpload size={18} />
-                  <span>Excel Yükle</span>
-                </button>
+                {/* Excel Yükle - Sadece Super Admin */}
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <FiUpload size={18} />
+                    <span>Excel Yükle</span>
+                  </button>
+                )}
 
+                {/* Excel İndir - Herkes */}
                 <button
                   onClick={handleExportExcel}
                   className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -485,6 +543,13 @@ const BranchProductManager = () => {
                 >
                   Filtreleri Temizle
                 </button>
+
+                {/* Şube yöneticisi ve ürün yoksa */}
+                {!isSuperAdmin && products.length === 0 && !searchTerm && !selectedCategory && (
+                  <p className="mt-4 text-orange-600">
+                    Şu anda şubenizde görüntülenecek ürün bulunmamaktadır. Lütfen yöneticinizle iletişime geçin.
+                  </p>
+                )}
               </div>
             ) : (
               <>
@@ -548,8 +613,8 @@ const BranchProductManager = () => {
                             <button
                               onClick={() => handleVisibilityToggle(product)}
                               className={`p-2 rounded-full transition-colors ${product.is_visible
-                                  ? "bg-green-100 text-green-600 hover:bg-green-200"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                ? "bg-green-100 text-green-600 hover:bg-green-200"
+                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                                 }`}
                               title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
                             >
@@ -565,13 +630,17 @@ const BranchProductManager = () => {
                               >
                                 <FiEdit2 size={18} />
                               </button>
-                              <button
-                                onClick={() => handleDelete(product)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                title="Sil"
-                              >
-                                <FiTrash2 size={18} />
-                              </button>
+
+                              {/* Silme butonu - Sadece Super Admin */}
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleDelete(product)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                  title="Sil"
+                                >
+                                  <FiTrash2 size={18} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -634,7 +703,7 @@ const BranchProductManager = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b p-4">
               <h3 className="text-xl font-semibold text-gray-800">
-                {editingProduct ? "Ürünü Düzenle" : "Yeni Ürün Ekle"}
+                {editingProduct ? `${editingProduct.name} Ürününü Düzenle` : "Yeni Ürün Ekle"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -657,7 +726,11 @@ const BranchProductManager = () => {
                     onChange={handleFormChange}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    disabled={editingProduct && !isSuperAdmin} // Şube yöneticisi düzenleyemez
                   />
+                  {editingProduct && !isSuperAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">Ürün adını yalnızca Süper Admin değiştirebilir.</p>
+                  )}
                 </div>
 
                 <div>
@@ -670,6 +743,7 @@ const BranchProductManager = () => {
                     onChange={handleFormChange}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    disabled={editingProduct && !isSuperAdmin} // Şube yöneticisi düzenleyemez
                   >
                     <option value="">Kategori Seçin</option>
                     {categories.map(category => (
@@ -678,6 +752,9 @@ const BranchProductManager = () => {
                       </option>
                     ))}
                   </select>
+                  {editingProduct && !isSuperAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">Kategoriyi yalnızca Süper Admin değiştirebilir.</p>
+                  )}
                 </div>
 
                 <div>
@@ -693,7 +770,11 @@ const BranchProductManager = () => {
                     min="0"
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    disabled={editingProduct && !isSuperAdmin} // Şube yöneticisi düzenleyemez
                   />
+                  {editingProduct && !isSuperAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">Fiyatı yalnızca Süper Admin değiştirebilir.</p>
+                  )}
                 </div>
 
                 <div>
@@ -708,6 +789,7 @@ const BranchProductManager = () => {
                     min="0"
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="mt-1 text-xs text-gray-500">Şubenizde bulunan ürün stok adedi</p>
                 </div>
 
                 <div>
@@ -721,7 +803,11 @@ const BranchProductManager = () => {
                     onChange={handleFormChange}
                     placeholder="https://example.com/image.jpg"
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={editingProduct && !isSuperAdmin} // Şube yöneticisi düzenleyemez
                   />
+                  {editingProduct && !isSuperAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">Görseli yalnızca Süper Admin değiştirebilir.</p>
+                  )}
                 </div>
 
                 <div className="flex items-center">
@@ -733,7 +819,7 @@ const BranchProductManager = () => {
                     onChange={handleFormChange}
                     className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                   />
-                  <label htmlFor="is_visible" className="ml-2 text-gray-700 text-sm font-medium">
+                  <label htmlFor="is_visible" className="ml-2 text-sm font-medium text-gray-700">
                     Ürün görünür olsun
                   </label>
                 </div>
@@ -748,7 +834,11 @@ const BranchProductManager = () => {
                     onChange={handleFormChange}
                     rows="3"
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={editingProduct && !isSuperAdmin} // Şube yöneticisi düzenleyemez
                   ></textarea>
+                  {editingProduct && !isSuperAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">Açıklamayı yalnızca Süper Admin değiştirebilir.</p>
+                  )}
                 </div>
               </div>
 
