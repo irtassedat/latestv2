@@ -9,34 +9,41 @@ console.log("Environment vars for API URL:", {
 
 // Determine the API base URL
 const determineBaseUrl = () => {
-  // Set from environment variable
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  
-  // Fallback based on environment
-  if (import.meta.env.MODE === 'development') {
-    return 'http://localhost:5050'; // Local development server
-  }
-  
-  // Production fallback - remove the /api suffix if that's causing the issue
-  return 'https://qr.405found.tr'; // Try without /api prefix
-};
 
+  if (import.meta.env.MODE === 'development') {
+    return 'http://localhost:5050';
+  }
+
+  // API soneki olmadan domain kullanın
+  return 'https://qr.405found.tr'; 
+};
 const api = axios.create({
   baseURL: determineBaseUrl(),
   timeout: 10000,
-  withCredentials: true
+  withCredentials: false
 });
 
 // Request interceptor to fix API path issues
 api.interceptors.request.use(config => {
-  // Check if we need to add /api prefix for production
-  if (!config.url.startsWith('/api/') && !config.url.startsWith('api/')) {
-    config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
-  }  
-  
-  console.log(`Making ${config.method.toUpperCase()} request to: ${config.baseURL}${config.url}`);
+  let url = config.url;
+  console.log('Original URL:', url);
+
+  // API prefixleri temizleme
+  if (url.includes('/api/api/')) {
+    url = url.replace('/api/api/', '/api/');
+    console.log('Fixed double API prefix:', url);
+  }
+
+  // URL için api prefix kontrolü
+  if (!url.startsWith('/api/')) {
+    url = `/api${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+
+  config.url = url;
+  console.log(`Final URL: ${config.baseURL}${config.url}`);
   return config;
 }, error => {
   return Promise.reject(error);
@@ -46,7 +53,6 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   response => response,
   error => {
-    // Log detailed error information
     console.error("API Error:", {
       endpoint: error.config?.url,
       method: error.config?.method,
@@ -54,7 +60,7 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     });
-    
+
     return Promise.reject(error);
   }
 );
