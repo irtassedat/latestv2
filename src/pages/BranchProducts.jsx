@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from "react";
+// src/pages/BranchProducts.jsx
+import { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/axios";
 import { FiEdit2, FiTrash2, FiEye, FiEyeOff, FiPlus, FiUpload, FiDownload } from "react-icons/fi";
@@ -8,24 +9,26 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import ReactPaginate from "react-paginate";
 import { useAuth } from "../contexts/AuthContext";
+import { SelectedBranchContext } from "../layout/MainLayout";
 
 const BranchProductManager = () => {
   const { id: paramId } = useParams();
-  const { currentUser, isSuperAdmin } = useAuth(); // Auth context'ten kullanıcı ve rol bilgisini al
+  const { currentUser, isSuperAdmin } = useAuth();
+  // MainLayout'dan seçilen şube ID'si
+  const contextBranchId = useContext(SelectedBranchContext);
+
   const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState(paramId || "");
+  const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const fileInputRef = useRef(null);
-  const [uploadLoading, setUploadLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -37,6 +40,8 @@ const BranchProductManager = () => {
   });
 
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
 
   // Kategorilere göre arkaplan renkleri
   const categoryColors = {
@@ -57,18 +62,6 @@ const BranchProductManager = () => {
     try {
       const response = await api.get("/api/branches");
       setBranches(response.data);
-
-      // Eğer URL'den gelen bir şube ID'si yoksa ve şubeler varsa
-      if (!paramId && response.data.length > 0) {
-        // Şube yöneticisi ise kendi şubesini otomatik seç
-        if (!isSuperAdmin && currentUser?.branch_id) {
-          setSelectedBranchId(currentUser.branch_id.toString());
-        }
-        // Super admin ise ilk şubeyi seç
-        else if (isSuperAdmin) {
-          setSelectedBranchId(response.data[0].id.toString());
-        }
-      }
     } catch (error) {
       console.error("Şubeler yüklenirken hata:", error);
       toast.error("Şubeler yüklenemedi!");
@@ -86,7 +79,7 @@ const BranchProductManager = () => {
     }
   };
 
-  // Şubeye ait ürünleri getir
+  // Şube ürünlerini getir
   const fetchBranchProducts = async (branchId) => {
     if (!branchId) return;
 
@@ -102,32 +95,34 @@ const BranchProductManager = () => {
     }
   };
 
+  // Sayfa yüklendiğinde veya değiştiğinde
   useEffect(() => {
     fetchBranches();
     fetchCategories();
   }, []);
 
+  // Şube seçimi değişince
   useEffect(() => {
-    // URL'den bir şube ID'si geldiyse veya bir şube seçildiyse
-    if (selectedBranchId) {
-      fetchBranchProducts(selectedBranchId);
-    }
-    // Şube yöneticisiyse ve hiçbir şube seçilmediyse kendi şubesini seç
-    else if (!isSuperAdmin && currentUser?.branch_id) {
-      setSelectedBranchId(currentUser.branch_id.toString());
-    }
-  }, [selectedBranchId, currentUser, isSuperAdmin]);
+    // URL'den gelen paramId, context'ten gelen contextBranchId veya şube yöneticisinin kendi şubesi
+    const effectiveBranchId = paramId || contextBranchId || (currentUser?.branch_id ? currentUser.branch_id.toString() : null);
 
-  // Şube değiştiğinde URL güncelle
-  const handleBranchChange = (e) => {
-    const branchId = e.target.value;
-    setSelectedBranchId(branchId);
-    if (branchId) {
-      navigate(`/admin/branches/${branchId}/products`);
-    } else {
-      navigate("/admin/branch-products");
+    if (effectiveBranchId) {
+      setSelectedBranchId(effectiveBranchId);
+      fetchBranchProducts(effectiveBranchId);
+
+      // URL güncelleme (optional)
+      if (!paramId) {
+        navigate(`/admin/branches/${effectiveBranchId}/products`, { replace: true });
+      }
+    } else if (branches.length > 0) {
+      // Eğer hiçbir ID belirtilmediyse ve şubeler yüklendiyse
+      const firstBranchId = branches[0].id.toString();
+      setSelectedBranchId(firstBranchId);
+      fetchBranchProducts(firstBranchId);
+
+      navigate(`/admin/branches/${firstBranchId}/products`, { replace: true });
     }
-  };
+  }, [paramId, contextBranchId, branches, currentUser, navigate]);
 
   // Ürün görünürlüğünü güncelle
   const handleVisibilityToggle = async (product) => {
@@ -339,7 +334,7 @@ const BranchProductManager = () => {
     const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
 
     // Şube adını al
-    const branchName = branches.find(b => b.id.toString() === selectedBranchId.toString())?.name || "Sube";
+    const branchName = branches.find(b => b.id.toString() === selectedBranchId?.toString())?.name || "Sube";
 
     // Dosya adında şube adı ve tarih bilgisi olsun
     const date = new Date().toISOString().split('T')[0];
@@ -429,12 +424,12 @@ const BranchProductManager = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <h1 className="text-2xl font-bold text-gray-800">Şube Ürün Yönetimi</h1>
 
-          {/* Şube Seçici - Sadece süper admin şube seçebilir */}
+          {/* Şube göstergesi */}
           <div className="w-full md:w-auto">
-            {isSuperAdmin ? (
+            {isSuperAdmin && branches.length > 1 ? (
               <select
-                value={selectedBranchId}
-                onChange={handleBranchChange}
+                value={selectedBranchId || ""}
+                onChange={(e) => navigate(`/admin/branches/${e.target.value}/products`)}
                 className="w-full md:w-64 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Şube Seçin</option>
@@ -445,9 +440,8 @@ const BranchProductManager = () => {
                 ))}
               </select>
             ) : (
-              // Şube yöneticisi ise kendi şubesinin adını göster
               <div className="text-lg font-medium text-gray-700 bg-gray-50 px-4 py-2 rounded-lg">
-                Şube: {branches.find(b => b.id.toString() === selectedBranchId.toString())?.name || "Yükleniyor..."}
+                Şube: {branches.find(b => b.id.toString() === selectedBranchId?.toString())?.name || "Yükleniyor..."}
               </div>
             )}
           </div>

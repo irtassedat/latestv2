@@ -1,3 +1,4 @@
+// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Dashboard from "./pages/Dashboard"
 import Products from "./pages/Products"
@@ -13,11 +14,10 @@ import FeedbackForm from "./pages/FeedbackForm"
 import Heatmap from "./pages/HeatMap"
 import ClarityAnalytics from "./components/ClarityAnalytics"
 import Branches from "./pages/Branches"
-import UserManagement from "./pages/UserManagement" // Kullanıcı yönetimi sayfası
-import UserProfile from "./pages/UserProfile" // veya "./pages/UserProfile.jsx"
-import PrivateRoute from "./components/PrivateRoute" // Özel rota bileşeni
-import { AuthProvider } from "./contexts/AuthContext" // Auth Context Provider
-
+import UserManagement from "./pages/UserManagement" 
+import UserProfile from "./pages/UserProfile" 
+import PrivateRoute from "./components/PrivateRoute" 
+import { AuthProvider } from "./contexts/AuthContext" 
 
 function App() {
   return (
@@ -31,6 +31,7 @@ function App() {
           
           {/* Kullanıcı Deneyimi Sayfaları - Yetki gerektirmez */}
           <Route path="/menu" element={<QrMenu />} />
+          <Route path="/menu/:branchId" element={<QrMenu />} /> {/* Şube bazlı menü */}
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/confirm" element={<ConfirmOrder />} />
           <Route path="/feedback" element={<FeedbackForm />} />

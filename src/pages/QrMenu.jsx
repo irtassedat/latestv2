@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useNavigate, useLocation, useParams } from "react-router-dom"
 import api from "../lib/axios"
 import toast from "react-hot-toast"
 import CesmeHeader from "../components/CesmeHeader"
 
 const QrMenu = () => {
-  const [branches, setBranches] = useState([])
-  const [selectedBranchId, setSelectedBranchId] = useState(1)
+  const { branchId } = useParams() // URL'den şube ID'sini alıyoruz
   const [products, setProducts] = useState([])
   const [activeCategory, setActiveCategory] = useState(null)
   const [cart, setCart] = useState([])
@@ -42,17 +41,12 @@ const QrMenu = () => {
     // Buraya daha fazla promosyon eklenebilir
   ]
 
-  // Slider boyutlarını hesapla - düzeltilmiş hali
+  // Slider boyutlarını hesapla
   useEffect(() => {
     const calculateSliderHeight = () => {
       if (!sliderContainerRef.current) return;
-
-      // Normal container genişliği kullan (2 katı değil)
       const containerWidth = sliderContainerRef.current.offsetWidth;
-
-      // 16:9 oranında yükseklik belirle - geleneksel slider oranı
       const calculatedHeight = containerWidth * (9 / 16);
-
       setSliderContainerHeight(calculatedHeight);
     }
 
@@ -162,45 +156,34 @@ const QrMenu = () => {
     }
   }, [isCartOpen, showFilterModal, isMenuOpen])
 
-  // Change this function to be more resilient
-  const fetchProducts = async () => {
+  // Şubeye ait ürünleri getir
+  const fetchBranchMenu = async () => {
+    if (!branchId) return;
+
     try {
-      // First check if branches exist
-      const branchResponse = await api.get('/branches');
-
-      // Only if branches exist, try to fetch branch products
-      if (branchResponse.data && branchResponse.data.length > 0) {
-        // Use the first available branch ID if selectedBranchId doesn't exist yet
-        const targetBranchId = selectedBranchId || branchResponse.data[0].id;
-
-        // Update selectedBranchId if needed
-        if (!selectedBranchId) {
-          setSelectedBranchId(targetBranchId);
-        }
-
-        // Now fetch the products for this branch
-        const productResponse = await api.get(`/branches/${targetBranchId}/products`);
-        setProducts(productResponse.data);
-      } else {
-        console.warn("No branches found. Cannot fetch products.");
-        setProducts([]);
-      }
+      const response = await api.get(`/api/branches/${branchId}/products`);
+      setProducts(response.data);
     } catch (err) {
-      console.error("Ürünler yüklenirken hata:", err.message);
+      console.error("Menü yüklenirken hata:", err.message);
+      setProducts([]);
 
-      // Fallback for demo - display some placeholder data if API fails
+      // Fallback - API bağlantısı yoksa örnek veri göster
       if (process.env.NODE_ENV !== 'production') {
         setProducts([
-          { id: 1, name: "Placeholder Item 1", price: 10, category_name: "Kahveler" },
-          { id: 2, name: "Placeholder Item 2", price: 15, category_name: "Tatlılar" }
+          { id: 1, name: "Türk Kahvesi", price: 35, category_name: "Kahveler" },
+          { id: 2, name: "Latte", price: 40, category_name: "Kahveler" },
+          { id: 3, name: "Sütlaç", price: 45, category_name: "Tatlılar" },
+          { id: 4, name: "Çeşme Kumru", price: 70, category_name: "Ana Yemekler" },
+          { id: 5, name: "Sade Çay", price: 15, category_name: "Çaylar" }
         ]);
       }
     }
   }
 
+  // Sayfa yüklendiğinde veya şube değiştiğinde menüyü getir
   useEffect(() => {
-    fetchProducts()
-  }, [selectedBranchId])
+    fetchBranchMenu();
+  }, [branchId]);
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -269,7 +252,7 @@ const QrMenu = () => {
           ? { ...item, quantity: item.quantity + 1 }
           : item
       )
-      : [...existingCart, { ...product, quantity: 1 }]
+      : [...existingCart, { ...product, quantity: 1, branch_id: branchId }] // Sepete eklenen ürüne şube ID'sini de ekle
 
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
     setCart(updatedCart)
@@ -286,16 +269,16 @@ const QrMenu = () => {
       },
       icon: '🛒',
     })
+
     if (window.clarity) {
       window.clarity("event", "add_to_cart", {
         productId: product.id,
         productName: product.name,
         price: product.price,
         quantity: 1,
+        branchId: branchId,
         cartTotal: updatedCart.reduce((sum, item) => sum + item.price * item.quantity, 0)
       });
-
-      console.log("Clarity: Sepete ekleme izlendi", product.name);
     }
   };
 
@@ -397,7 +380,7 @@ const QrMenu = () => {
     return () => window.removeEventListener("focus", syncCart)
   }, [])
 
-  // Resimlerin yüklendiğini kontrol etmek için - düzeltilmiş hali
+  // Resimlerin yüklendiğini kontrol etmek için
   const handleImageLoad = (e) => {
     if (sliderContainerRef.current && e.target.naturalWidth) {
       const containerWidth = sliderContainerRef.current.offsetWidth;
@@ -408,7 +391,7 @@ const QrMenu = () => {
 
   const handleProductClick = (product) => {
     // Ürün detay sayfasına yönlendir
-    navigate(`/product/${product.id}`, { state: { product } });
+    navigate(`/product/${product.id}`, { state: { product, branchId } });
 
     // Clarity olay izleme - ürün görüntüleme
     if (window.clarity) {
@@ -420,10 +403,9 @@ const QrMenu = () => {
         productId: product.id,
         productName: product.name,
         category: product.category_name || "Kategori Yok",
-        price: product.price
+        price: product.price,
+        branchId: branchId
       });
-
-      console.log("Clarity: Ürün tıklama izlendi", product.name);
     }
   };
 
@@ -435,6 +417,7 @@ const QrMenu = () => {
       >
         <CesmeHeader />
       </div>
+
       {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
       {showCategoryHeader && (
         <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
@@ -484,7 +467,7 @@ const QrMenu = () => {
       )}
 
       <div className="px-4 py-4">
-        {/* Promosyon Slider - Düzeltilmiş hali */}
+        {/* Promosyon Slider */}
         <div className="mb-8">
           <div
             ref={sliderContainerRef}
@@ -531,6 +514,7 @@ const QrMenu = () => {
             </div>
           </div>
         </div>
+
         {/* Önerilen Ürünler */}
         {recommendedProducts.length > 0 && (
           <div className="mb-8">
@@ -539,7 +523,7 @@ const QrMenu = () => {
               {recommendedProducts.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => navigate(`/product/${p.id}`, { state: { product: p } })}
+                  onClick={() => handleProductClick(p)}
                   className="cursor-pointer min-w-[200px] bg-white rounded-lg shadow p-3 flex gap-3 items-center hover:shadow-md transition"
                 >
                   <div className="w-20 h-20 rounded overflow-hidden">
@@ -857,7 +841,10 @@ const QrMenu = () => {
                     onClick={() => {
                       const currentCart = [...cart];
                       navigate("/confirm", {
-                        state: { cart: currentCart },
+                        state: {
+                          cart: currentCart,
+                          branchId: branchId
+                        },
                         search: location.search
                       });
                     }}

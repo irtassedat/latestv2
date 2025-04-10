@@ -1,14 +1,15 @@
 // src/lib/axios.js
 import axios from "axios";
 
-// For debugging
+// Debugging
 console.log("Environment vars for API URL:", {
   VITE_API_URL: import.meta.env.VITE_API_URL,
   MODE: import.meta.env.MODE
 });
 
-// Determine the API base URL
+// API base URL'yi belirle
 const determineBaseUrl = () => {
+  // Direkt URL'yi kullan, /api eki ekleme
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
@@ -17,39 +18,40 @@ const determineBaseUrl = () => {
     return 'http://localhost:5050';
   }
 
-  // API soneki olmadan domain kullanın
-  return 'https://qr.405found.tr'; 
+  // Sadece domain kullan, /api ekini KALDIRDIM
+  return 'https://qr.405found.tr';
 };
+
 const api = axios.create({
   baseURL: determineBaseUrl(),
   timeout: 10000,
   withCredentials: false
 });
 
-// Request interceptor to fix API path issues
+// API isteklerini normalize eden interceptor
 api.interceptors.request.use(config => {
-  let url = config.url;
-  console.log('Original URL:', url);
-
-  // API prefixleri temizleme
-  if (url.includes('/api/api/')) {
-    url = url.replace('/api/api/', '/api/');
-    console.log('Fixed double API prefix:', url);
+  // Orijinal URL'yi logla
+  console.log('Original request URL:', config.url);
+  
+  // Çift /api/api hatasını düzelt
+  if (config.url.includes('/api/api/')) {
+    config.url = config.url.replace('/api/api/', '/api/');
+    console.log('Fixed double API prefix:', config.url);
   }
-
-  // URL için api prefix kontrolü
-  if (!url.startsWith('/api/')) {
-    url = `/api${url.startsWith('/') ? '' : '/'}${url}`;
+  
+  // URL'nin başında /api varsa bırak, yoksa ekle
+  if (!config.url.startsWith('/api/')) {
+    config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
   }
-
-  config.url = url;
-  console.log(`Final URL: ${config.baseURL}${config.url}`);
+  
+  // Son URL'yi logla
+  console.log(`Final request URL: ${config.baseURL}${config.url}`);
   return config;
 }, error => {
   return Promise.reject(error);
 });
 
-// Response interceptor for better error handling
+// Hata yakalama interceptor'ı
 api.interceptors.response.use(
   response => response,
   error => {
@@ -60,7 +62,7 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     });
-
+    
     return Promise.reject(error);
   }
 );

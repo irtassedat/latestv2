@@ -1,11 +1,17 @@
 // src/layout/MainLayout.jsx
-import { useState, useEffect } from "react"
+import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { FiLogOut, FiUser, FiSettings, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
+import api from "../lib/axios"
+
+// Şube context'i oluştur
+export const SelectedBranchContext = createContext(null);
 
 const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [userBranches, setUserBranches] = useState([])
+  const [selectedBranchId, setSelectedBranchId] = useState(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser, logout, isSuperAdmin, isBranchManager } = useAuth()
@@ -18,12 +24,61 @@ const MainLayout = () => {
     }
   }, []);
 
+  // Kullanıcının erişebileceği şubeleri getir
+  useEffect(() => {
+    const fetchUserBranches = async () => {
+      try {
+        let response;
+        if (isSuperAdmin) {
+          // Super admin tüm şubelere erişebilir
+          response = await api.get('/api/branches');
+        } else if (isBranchManager && currentUser?.branch_id) {
+          // Şube yöneticisi sadece kendi şubesine erişebilir
+          response = await api.get(`/api/branches/${currentUser.branch_id}`);
+          response.data = [response.data]; // Tek şubeyi dizi formatına çevir
+        } else {
+          response = { data: [] };
+        }
+        
+        setUserBranches(response.data);
+        
+        // Eğer şube seçilmemişse, kullanıcının ilk şubesini seç
+        if (response.data.length > 0 && !selectedBranchId) {
+          setSelectedBranchId(response.data[0].id);
+          // Şube bilgisini session storage'a kaydet
+          sessionStorage.setItem('selectedBranchId', response.data[0].id);
+        }
+      } catch (err) {
+        console.error("Kullanıcı şubeleri alınırken hata:", err);
+      }
+    };
+    
+    if (currentUser) {
+      fetchUserBranches();
+    }
+  }, [currentUser, isSuperAdmin, isBranchManager]);
+
+  // Session storage'dan seçili şubeyi yükle
+  useEffect(() => {
+    const storedBranchId = sessionStorage.getItem('selectedBranchId');
+    if (storedBranchId) {
+      setSelectedBranchId(storedBranchId);
+    }
+  }, []);
+
   // Sidebar durumunu kaydet
   const toggleSidebar = () => {
     const newState = !sidebarOpen;
     setSidebarOpen(newState);
     localStorage.setItem('sidebarOpen', JSON.stringify(newState));
   }
+
+  // Şube değişince session storage'a kaydet
+  const handleBranchChange = (e) => {
+    const branchId = e.target.value;
+    setSelectedBranchId(branchId);
+    sessionStorage.setItem('selectedBranchId', branchId);
+  };
 
   // Çıkış işlemi
   const handleLogout = () => {
@@ -151,6 +206,26 @@ const MainLayout = () => {
             </div>
 
             <div className="flex items-center gap-4">
+              {/* Şube Seçici - Birden fazla şube varsa göster */}
+              {userBranches.length > 0 && (
+                <div className="bg-gray-100 border border-gray-300 rounded-lg px-3 py-2">
+                  <label htmlFor="branch-select" className="text-sm text-gray-600 mr-2">Şube:</label>
+                  <select
+                    id="branch-select"
+                    value={selectedBranchId || ""}
+                    onChange={handleBranchChange}
+                    className="bg-transparent border-none focus:outline-none text-gray-700 text-sm"
+                  >
+                    {userBranches.map(branch => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Kullanıcı Profil Kısmı */}
               <div className="flex items-center gap-2 bg-gray-100 p-2 rounded-full">
                 <div className="w-8 h-8 bg-[#1a3c61] text-white rounded-full flex items-center justify-center font-medium">
                   {currentUser?.username?.charAt(0)?.toUpperCase() || "U"}
@@ -164,7 +239,10 @@ const MainLayout = () => {
         </header>
 
         <main className="p-4 sm:p-6">
-          <Outlet />
+          {/* Context Provider ile seçili şubeyi tüm bileşenlere aktaralım */}
+          <SelectedBranchContext.Provider value={selectedBranchId}>
+            <Outlet />
+          </SelectedBranchContext.Provider>
         </main>
         
         {/* Footer */}
