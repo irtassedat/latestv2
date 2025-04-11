@@ -24,7 +24,7 @@ const determineBaseUrl = () => {
 
 const api = axios.create({
   baseURL: determineBaseUrl(),
-  timeout: 10000,
+  timeout: 30000, 
   withCredentials: false
 });
 
