@@ -157,33 +157,67 @@ const QrMenu = () => {
   }, [isCartOpen, showFilterModal, isMenuOpen])
 
   // Şubeye ait ürünleri getir
-  const fetchBranchMenu = async () => {
-    if (!branchId) return;
+  const fetchBranchMenu = async (branch_id) => {
+    if (!branch_id) {
+      console.log("Şube ID'si belirtilmedi, varsayılan şube ürünleri getiriliyor");
+      try {
+        // Şube ID'si belirtilmemişse tüm şubeleri getir ve ilk şubeyi kullan
+        const branchesResponse = await api.get("/api/branches");
+        if (branchesResponse.data && branchesResponse.data.length > 0) {
+          const defaultBranchId = branchesResponse.data[0].id;
+          console.log(`Varsayılan şube ID'si: ${defaultBranchId}`);
+
+          // Varsayılan şubenin ürünlerini getir
+          const productsResponse = await api.get(`/api/branches/${defaultBranchId}/products`);
+          setProducts(productsResponse.data);
+
+          // URL'i güncelle (sayfa yenilenmez)
+          navigate(`/menu/${defaultBranchId}`, { replace: true });
+        }
+      } catch (err) {
+        console.error("Şubeler yüklenirken hata:", err.message);
+        loadFallbackProducts();
+      }
+      return;
+    }
 
     try {
-      const response = await api.get(`/api/branches/${branchId}/products`);
-      setProducts(response.data);
+      console.log(`${branch_id} ID'li şubenin ürünleri getiriliyor...`);
+      const response = await api.get(`/api/branches/${branch_id}/products`);
+
+      if (response.data && response.data.length > 0) {
+        console.log(`${response.data.length} ürün başarıyla yüklendi`);
+        setProducts(response.data);
+      } else {
+        console.warn("Şube için ürün bulunamadı:", branch_id);
+        loadFallbackProducts();
+      }
     } catch (err) {
       console.error("Menü yüklenirken hata:", err.message);
-      setProducts([]);
-
-      // Fallback - API bağlantısı yoksa örnek veri göster
-      if (process.env.NODE_ENV !== 'production') {
-        setProducts([
-          { id: 1, name: "Türk Kahvesi", price: 35, category_name: "Kahveler" },
-          { id: 2, name: "Latte", price: 40, category_name: "Kahveler" },
-          { id: 3, name: "Sütlaç", price: 45, category_name: "Tatlılar" },
-          { id: 4, name: "Çeşme Kumru", price: 70, category_name: "Ana Yemekler" },
-          { id: 5, name: "Sade Çay", price: 15, category_name: "Çaylar" }
-        ]);
-      }
+      loadFallbackProducts();
     }
-  }
+  };
+
+  const loadFallbackProducts = () => {
+    setProducts([]);
+    
+    // API bağlantısı yoksa örnek veri göster
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Örnek ürün verileri yükleniyor...");
+      setProducts([
+        { id: 1, name: "Türk Kahvesi", price: 35, category_name: "Kahveler" },
+        { id: 2, name: "Latte", price: 40, category_name: "Kahveler" },
+        { id: 3, name: "Sütlaç", price: 45, category_name: "Tatlılar" },
+        { id: 4, name: "Çeşme Kumru", price: 70, category_name: "Ana Yemekler" },
+        { id: 5, name: "Sade Çay", price: 15, category_name: "Çaylar" }
+      ]);
+    }
+  };
 
   // Sayfa yüklendiğinde veya şube değiştiğinde menüyü getir
   useEffect(() => {
-    fetchBranchMenu();
-  }, [branchId]);
+    fetchBranchMenu(branchId);
+  }, [branchId, navigate]);
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

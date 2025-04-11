@@ -10,6 +10,7 @@ import { saveAs } from "file-saver";
 import ReactPaginate from "react-paginate";
 import { useAuth } from "../contexts/AuthContext";
 import { SelectedBranchContext } from "../layout/MainLayout";
+import { useRef } from "react";
 
 const BranchProductManager = () => {
   const { id: paramId } = useParams();
@@ -81,15 +82,46 @@ const BranchProductManager = () => {
 
   // Şube ürünlerini getir
   const fetchBranchProducts = async (branchId) => {
-    if (!branchId) return;
+    if (!branchId) {
+      console.error("fetchBranchProducts: Şube ID'si belirtilmedi");
+      setLoading(false);
+      return;
+    }
 
+    console.log(`${branchId} ID'li şubenin ürünleri getiriliyor...`);
     setLoading(true);
     try {
-      const response = await api.get(`/api/products/branch/${branchId}`);
-      setProducts(response.data);
+      // API call URL'sini doğru oluştur
+      const url = `/api/products/branch/${branchId}`;
+      console.log("API call URL:", url);
+      
+      const response = await api.get(url);
+      
+      if (response.data && Array.isArray(response.data)) {
+        console.log(`${response.data.length} ürün başarıyla yüklendi`);
+        setProducts(response.data);
+      } else {
+        console.warn("API'den beklenmeyen yanıt formatı:", response.data);
+        setProducts([]);
+        toast.error("Ürün verileri alınırken bir sorun oluştu!");
+      }
     } catch (error) {
       console.error("Ürünler yüklenirken hata:", error);
-      toast.error("Ürünler yüklenemedi!");
+      setProducts([]);
+      
+      // Hata mesajını daha açıklayıcı hale getir
+      if (error.response) {
+        // Sunucu yanıtı ile gelen hata
+        console.error("Sunucu yanıtı:", error.response.status, error.response.data);
+        toast.error(`Ürünler yüklenemedi! (${error.response.status}: ${error.response.data.error || 'Bilinmeyen hata'})`);
+      } else if (error.request) {
+        // İstek yapıldı ama yanıt alınamadı
+        console.error("Sunucudan yanıt alınamadı:", error.request);
+        toast.error("Sunucu yanıt vermiyor. Lütfen internet bağlantınızı kontrol edin!");
+      } else {
+        // İstek oluşturulurken bir şeyler yanlış gitti
+        toast.error(`Ürünler yüklenemedi: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -103,8 +135,19 @@ const BranchProductManager = () => {
 
   // Şube seçimi değişince
   useEffect(() => {
+    // Şubeler henüz yüklenmediyse işlem yapma
+    if (loading && branches.length === 0) return;
+
     // URL'den gelen paramId, context'ten gelen contextBranchId veya şube yöneticisinin kendi şubesi
     const effectiveBranchId = paramId || contextBranchId || (currentUser?.branch_id ? currentUser.branch_id.toString() : null);
+
+    console.log("Şube seçimi güncelleniyor:", {
+      paramId,
+      contextBranchId,
+      currentUserBranchId: currentUser?.branch_id,
+      effectiveBranchId,
+      branchesLoaded: branches.length > 0
+    });
 
     if (effectiveBranchId) {
       setSelectedBranchId(effectiveBranchId);
@@ -117,12 +160,17 @@ const BranchProductManager = () => {
     } else if (branches.length > 0) {
       // Eğer hiçbir ID belirtilmediyse ve şubeler yüklendiyse
       const firstBranchId = branches[0].id.toString();
+      console.log("Varsayılan ilk şube kullanılıyor:", firstBranchId);
       setSelectedBranchId(firstBranchId);
       fetchBranchProducts(firstBranchId);
 
       navigate(`/admin/branches/${firstBranchId}/products`, { replace: true });
+    } else {
+      console.error("Şube seçilemedi: Kullanılabilir şube bulunamadı");
+      setLoading(false); // Yükleme durumunu sonlandır
+      toast.error("Kullanılabilir şube bulunamadı. Lütfen sistem yöneticinize başvurun.");
     }
-  }, [paramId, contextBranchId, branches, currentUser, navigate]);
+  }, [paramId, contextBranchId, branches, currentUser, loading, navigate]);
 
   // Ürün görünürlüğünü güncelle
   const handleVisibilityToggle = async (product) => {
