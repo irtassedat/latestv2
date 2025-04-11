@@ -2,7 +2,7 @@
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
-import { FiLogOut, FiUser, FiSettings, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
+import { FiLogOut, FiUser, FiBarChart, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
 import api from "../lib/axios"
 
 // Şube context'i oluştur
