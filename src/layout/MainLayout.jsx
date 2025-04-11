@@ -86,35 +86,36 @@ const MainLayout = () => {
   }
 
   // Rol bazlı menü öğeleri
-  const getMenuItems = () => {
-    // Tüm kullanıcıların erişebileceği temel menü öğeleri
-    const baseMenuItems = [
-      { path: "/admin", label: "Dashboard", icon: <FiHome size={20} /> },
-      { path: "/admin/profile", label: "Profil", icon: <FiUser size={20} /> },
-    ];
-    
-    // Sadece super admin'in görebileceği menü öğeleri
-    const superAdminItems = [
-      { path: "/admin/branches", label: "Şubeler", icon: <FiMap size={20} /> },
-      { path: "/admin/products", label: "Ürünler", icon: <FiPackage size={20} /> },
-      { path: "/admin/users", label: "Kullanıcılar", icon: <FiUsers size={20} /> },
-      { path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> },
-    ];
-    
-    // Hem super admin hem de branch manager'ın görebileceği menü öğeleri
-    const sharedItems = [
-      { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
-      { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
-      { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },
-    ];
-    
-    // Rol bazlı menü öğelerini birleştir
-    if (isSuperAdmin) {
-      return [...baseMenuItems, ...superAdminItems, ...sharedItems];
-    } else {
-      return [...baseMenuItems, ...sharedItems];
-    }
-  };
+const getMenuItems = () => {
+  // Tüm kullanıcıların erişebileceği temel menü öğeleri
+  const baseMenuItems = [
+    { path: "/admin", label: "Dashboard", icon: <FiHome size={20} /> },
+    { path: "/admin/profile", label: "Profil", icon: <FiUser size={20} /> },
+  ];
+  
+  // Sadece super admin'in görebileceği menü öğeleri
+  const superAdminItems = [
+    { path: "/admin/branches", label: "Şubeler", icon: <FiMap size={20} /> },
+    { path: "/admin/products", label: "Ürünler", icon: <FiPackage size={20} /> },
+    { path: "/admin/users", label: "Kullanıcılar", icon: <FiUsers size={20} /> },
+    { path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> },
+  ];
+  
+  // Hem super admin hem de branch manager'ın görebileceği menü öğeleri
+  const sharedItems = [
+    { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
+    { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
+    { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> }, // Yeni eklenen
+    { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },
+  ];
+  
+  // Rol bazlı menü öğelerini birleştir
+  if (isSuperAdmin) {
+    return [...baseMenuItems, ...superAdminItems, ...sharedItems];
+  } else {
+    return [...baseMenuItems, ...sharedItems];
+  }
+};
 
   const menuItems = getMenuItems();
 

@@ -113,44 +113,47 @@ const CesmeHeader = () => {
             display: 'flex',
           }}
         >
-          {/* Sol Menü Paneli */}
+          {/* Sol Menü Paneli - Düzeltme: max-width ekledik, fazla yükseklik almayacak ve içerik sığacak */}
           <div 
             style={{
               width: '80%',
               height: '100%',
+              maxWidth: '350px',
               backgroundColor: 'white',
               boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.2)',
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
               animation: 'slideIn 0.3s ease-out forwards',
+              overflowY: 'auto', // Mobil cihazlarda scroll olması için
             }}
           >
-            {/* Menü İçeriği */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Menü İçeriği - İçeriği daha kompakt hale getirelim */}
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Kapat Butonu */}
               <button
                 onClick={closeMenu}
                 style={{
                   position: 'absolute',
-                  top: '16px',
-                  right: '16px',
+                  top: '10px',
+                  right: '10px',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
                   color: '#555',
+                  zIndex: 10,
                 }}
               >
                 <FaTimes style={{ width: '20px', height: '20px' }} />
               </button>
               
-              {/* Sosyal Medya */}
+              {/* Sosyal Medya - padding azaltıldı */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'center',
                 gap: '24px',
-                marginTop: '24px',
-                marginBottom: '40px',
+                marginTop: '16px',
+                marginBottom: '20px',
                 color: '#022B45',
                 fontSize: '24px',
               }}>
@@ -160,41 +163,41 @@ const CesmeHeader = () => {
                 <FaYoutube style={{ cursor: 'pointer' }} />
               </div>
               
-              {/* Menü Öğeleri */}
-              <div style={{ flexGrow: 1 }}>
+              {/* Menü Öğeleri - gap küçültüldü */}
+              <div style={{ flexGrow: 0 }}>
                 <div style={{ 
                   display: 'flex', 
                   flexDirection: 'column', 
-                  gap: '24px',
+                  gap: '16px',
                   color: '#022B45',
                   fontSize: '18px',
                   fontWeight: '500',
                 }}>
                   <button 
                     onClick={() => { navigate("/dil"); closeMenu(); }}
-                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                    style={{ textAlign: 'left', padding: '6px 0', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     🌐 Dil (TR)
                   </button>
                   <button 
                     onClick={() => { navigate("/rezervasyon"); closeMenu(); }}
-                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                    style={{ textAlign: 'left', padding: '6px 0', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     📅 Rezervasyon Oluştur
                   </button>
                   <button 
                     onClick={handleFeedback}
-                    style={{ textAlign: 'left', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer' }}
+                    style={{ textAlign: 'left', padding: '6px 0', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     💬 Geri Bildirim Ver
                   </button>
                 </div>
               </div>
               
-              {/* Login Butonu */}
+              {/* Login Butonu - Marginler azaltıldı */}
               <div style={{ 
                 marginTop: 'auto', 
-                paddingTop: '24px', 
+                paddingTop: '16px', 
                 borderTop: '1px solid #eee',
               }}>
                 <button
@@ -203,11 +206,12 @@ const CesmeHeader = () => {
                     width: '100%',
                     backgroundColor: '#022B45',
                     color: 'white',
-                    padding: '16px',
+                    padding: '12px',
                     borderRadius: '8px',
                     border: 'none',
                     fontWeight: '500',
-                    marginTop: '16px',
+                    marginTop: '8px',
+                    marginBottom: '8px',
                     cursor: 'pointer',
                     display: 'flex',
                     justifyContent: 'center',
@@ -222,9 +226,10 @@ const CesmeHeader = () => {
                 </button>
               </div>
               
-              {/* Telif Hakkı */}
+              {/* Telif Hakkı - Margin azaltıldı */}
               <div style={{
-                marginTop: '24px',
+                marginTop: '4px',
+                marginBottom: '8px',
                 textAlign: 'center',
                 fontSize: '12px',
                 color: '#888',

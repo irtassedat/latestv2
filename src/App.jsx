@@ -12,6 +12,7 @@ import ProductDetail from "./pages/ProductDetail"
 import { Toaster } from "react-hot-toast"
 import FeedbackForm from "./pages/FeedbackForm"
 import Heatmap from "./pages/HeatMap"
+import BranchAnalytics from "./pages/BranchAnalytics" // Yeni eklenen bileşen
 import ClarityAnalytics from "./components/ClarityAnalytics"
 import Branches from "./pages/Branches"
 import UserManagement from "./pages/UserManagement" 
@@ -59,6 +60,10 @@ function App() {
                 <Route path="branch-products" element={<BranchProducts />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="branches/:id/products" element={<BranchProducts />} />
+                
+                {/* Yeni Eklenen - Şube Analitiği */}
+                <Route path="branches/:branchId/analytics" element={<BranchAnalytics />} />
+                <Route path="analytics" element={<BranchAnalytics />} /> {/* Varsayılan şube analitiği */}
               </Route>
             </Route>
           </Route>
