@@ -2,7 +2,7 @@
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
-import { FiLogOut, FiUser, FiBarChart, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
+import { FiLogOut, FiUser, FiBriefcase, FiLayers, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
 import api from "../lib/axios"
 
 // Şube context'i oluştur
@@ -39,9 +39,9 @@ const MainLayout = () => {
         } else {
           response = { data: [] };
         }
-        
+
         setUserBranches(response.data);
-        
+
         // Eğer şube seçilmemişse, kullanıcının ilk şubesini seç
         if (response.data.length > 0 && !selectedBranchId) {
           setSelectedBranchId(response.data[0].id);
@@ -52,7 +52,7 @@ const MainLayout = () => {
         console.error("Kullanıcı şubeleri alınırken hata:", err);
       }
     };
-    
+
     if (currentUser) {
       fetchUserBranches();
     }
@@ -86,43 +86,45 @@ const MainLayout = () => {
   }
 
   // Rol bazlı menü öğeleri
-const getMenuItems = () => {
-  // Tüm kullanıcıların erişebileceği temel menü öğeleri
-  const baseMenuItems = [
-    { path: "/admin", label: "Dashboard", icon: <FiHome size={20} /> },
-    { path: "/admin/profile", label: "Profil", icon: <FiUser size={20} /> },
-  ];
-  
-  // Sadece super admin'in görebileceği menü öğeleri
-  const superAdminItems = [
-    { path: "/admin/branches", label: "Şubeler", icon: <FiMap size={20} /> },
-    { path: "/admin/products", label: "Ürünler", icon: <FiPackage size={20} /> },
-    { path: "/admin/users", label: "Kullanıcılar", icon: <FiUsers size={20} /> },
-    { path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> },
-  ];
-  
-  // Hem super admin hem de branch manager'ın görebileceği menü öğeleri
-  const sharedItems = [
-    { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
-    { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
-    { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> }, // Yeni eklenen
-    { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },
-  ];
-  
-  // Rol bazlı menü öğelerini birleştir
-  if (isSuperAdmin) {
-    return [...baseMenuItems, ...superAdminItems, ...sharedItems];
-  } else {
-    return [...baseMenuItems, ...sharedItems];
-  }
-};
+  const getMenuItems = () => {
+    // Tüm kullanıcıların erişebileceği temel menü öğeleri
+    const baseMenuItems = [
+      { path: "/admin", label: "Dashboard", icon: <FiHome size={20} /> },
+      { path: "/admin/profile", label: "Profil", icon: <FiUser size={20} /> },
+    ];
+
+    // Sadece super admin'in görebileceği menü öğeleri
+    const superAdminItems = [
+      { path: "/admin/brands", label: "Markalar", icon: <FiBriefcase size={20} /> },
+      { path: "/admin/templates", label: "Şablonlar", icon: <FiLayers size={20} /> },
+      { path: "/admin/branches", label: "Şubeler", icon: <FiMap size={20} /> },
+      { path: "/admin/products", label: "Ürünler", icon: <FiPackage size={20} /> },
+      { path: "/admin/users", label: "Kullanıcılar", icon: <FiUsers size={20} /> },
+      { path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> },
+    ];
+
+    // Hem super admin hem de branch manager'ın görebileceği menü öğeleri
+    const sharedItems = [
+      { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
+      { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
+      { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> }, // Yeni eklenen
+      { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },
+    ];
+
+    // Rol bazlı menü öğelerini birleştir
+    if (isSuperAdmin) {
+      return [...baseMenuItems, ...superAdminItems, ...sharedItems];
+    } else {
+      return [...baseMenuItems, ...sharedItems];
+    }
+  };
 
   const menuItems = getMenuItems();
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
       {/* Sidebar */}
-      <div 
+      <div
         className={`bg-[#022B45] text-white fixed h-full z-40 transition-all duration-300 shadow-lg
           ${sidebarOpen ? "w-64" : "w-20"}`}
       >
@@ -134,7 +136,7 @@ const getMenuItems = () => {
             ) : (
               <div className="mx-auto font-bold text-xl">☕</div>
             )}
-            
+
             <button
               onClick={toggleSidebar}
               className="text-white/80 hover:text-white"
@@ -148,7 +150,7 @@ const getMenuItems = () => {
             <div className="h-10 w-10 rounded-full bg-[#D98A3D] text-white flex items-center justify-center font-medium text-lg">
               {currentUser?.username?.charAt(0)?.toUpperCase() || "U"}
             </div>
-            
+
             {sidebarOpen && (
               <div className="ml-3 overflow-hidden">
                 <p className="text-sm font-medium truncate">{currentUser?.username}</p>
@@ -168,11 +170,10 @@ const getMenuItems = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center py-3 px-4 transition-colors ${
-                  location.pathname === item.path
+                className={`flex items-center py-3 px-4 transition-colors ${location.pathname === item.path
                     ? "bg-[#D98A3D] text-white"
                     : "text-white/80 hover:bg-[#D98A3D]/30"
-                } ${!sidebarOpen ? "justify-center" : ""}`}
+                  } ${!sidebarOpen ? "justify-center" : ""}`}
               >
                 <span className="text-lg">{item.icon}</span>
                 {sidebarOpen && <span className="ml-3 text-sm">{item.label}</span>}
@@ -194,10 +195,9 @@ const getMenuItems = () => {
       </div>
 
       {/* Main Content */}
-      <div 
-        className={`flex-1 transition-all duration-300 ${
-          sidebarOpen ? "ml-64" : "ml-20"
-        }`}
+      <div
+        className={`flex-1 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-20"
+          }`}
       >
         <header className="bg-white shadow-sm">
           <div className="flex justify-between items-center px-6 py-4">
@@ -245,7 +245,7 @@ const getMenuItems = () => {
             <Outlet />
           </SelectedBranchContext.Provider>
         </main>
-        
+
         {/* Footer */}
         <footer className="bg-white p-4 text-center text-sm text-gray-500 border-t">
           <p>&copy; {new Date().getFullYear()} Çeşme Kahve - Tüm Hakları Saklıdır</p>

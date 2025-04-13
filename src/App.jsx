@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - Güncellenen Rotalar
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Dashboard from "./pages/Dashboard"
 import Products from "./pages/Products"
@@ -12,13 +12,16 @@ import ProductDetail from "./pages/ProductDetail"
 import { Toaster } from "react-hot-toast"
 import FeedbackForm from "./pages/FeedbackForm"
 import Heatmap from "./pages/HeatMap"
-import BranchAnalytics from "./pages/BranchAnalytics" // Yeni eklenen bileşen
+import BranchAnalytics from "./pages/BranchAnalytics"
 import ClarityAnalytics from "./components/ClarityAnalytics"
 import Branches from "./pages/Branches"
-import UserManagement from "./pages/UserManagement" 
-import UserProfile from "./pages/UserProfile" 
-import PrivateRoute from "./components/PrivateRoute" 
-import { AuthProvider } from "./contexts/AuthContext" 
+import UserManagement from "./pages/UserManagement"
+import UserProfile from "./pages/UserProfile"
+import PrivateRoute from "./components/PrivateRoute"
+import { AuthProvider } from "./contexts/AuthContext"
+import BrandManager from "./components/BranchManager"
+import TemplateManager from "./components/TemplateManager"
+import EnhancedBranchManager from "./components/EnhancedBranchManager"
 
 function App() {
   return (
@@ -49,10 +52,15 @@ function App() {
               
               {/* Sadece Super Admin erişebilir */}
               <Route element={<PrivateRoute allowedRoles={["super_admin"]} />}>
+                <Route path="brands" element={<BrandManager />} />
+                <Route path="templates" element={<TemplateManager />} />
                 <Route path="branches" element={<Branches />} />
                 <Route path="products" element={<Products />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="heatmap" element={<Heatmap />} />
+                
+                {/* Yeni Eklenen Rotalar */}
+                <Route path="brands/:brandId/branches" element={<EnhancedBranchManager />} />
               </Route>
               
               {/* Hem Super Admin hem de Branch Manager erişebilir */}

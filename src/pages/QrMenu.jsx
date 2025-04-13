@@ -200,7 +200,7 @@ const QrMenu = () => {
 
   const loadFallbackProducts = () => {
     setProducts([]);
-    
+
     // API bağlantısı yoksa örnek veri göster
     if (process.env.NODE_ENV !== 'production') {
       console.log("Örnek ürün verileri yükleniyor...");
@@ -442,6 +442,30 @@ const QrMenu = () => {
       });
     }
   };
+
+
+  useEffect(() => {
+    const fetchBranchMenu = async (branch_id) => {
+      // ...
+      try {
+        // Şube bilgilerini şablon bilgileriyle birlikte al
+        const branchResponse = await api.get(`/api/branches/${branch_id}`);
+        const branch = branchResponse.data;
+
+        // Şube şablonlarına göre ürünleri ve fiyatları getir
+        const productsResponse = await api.get(`/api/branches/${branch_id}/products`, {
+          params: {
+            menu_template_id: branch.menu_template_id,
+            price_template_id: branch.price_template_id
+          }
+        });
+
+        setProducts(productsResponse.data);
+      } catch (err) {
+        // Hata yönetimi
+      }
+    };
+  }, [branchId]);
 
   return (
     <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
