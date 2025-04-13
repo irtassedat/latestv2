@@ -1,4 +1,4 @@
-// src/App.jsx - Güncellenen Rotalar
+// src/App.jsx - Geliştirilmiş Rota Yapısı
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Dashboard from "./pages/Dashboard"
 import Products from "./pages/Products"
@@ -19,9 +19,9 @@ import UserManagement from "./pages/UserManagement"
 import UserProfile from "./pages/UserProfile"
 import PrivateRoute from "./components/PrivateRoute"
 import { AuthProvider } from "./contexts/AuthContext"
-import BrandManager from "./components/BranchManager"
+import BrandManager from "./pages/BrandManager"  // BrandManager bir sayfa olarak kullanılacak
 import TemplateManager from "./components/TemplateManager"
-import EnhancedBranchManager from "./components/EnhancedBranchManager"
+import EnhancedBranchManager from "./pages/EnhancedBranchManager.jsx"  // EnhancedBranchManager bir sayfa olarak kullanılacak
 
 function App() {
   return (
@@ -52,26 +52,32 @@ function App() {
               
               {/* Sadece Super Admin erişebilir */}
               <Route element={<PrivateRoute allowedRoles={["super_admin"]} />}>
+                {/* Markalar ve İlişkili Sayfalar */}
                 <Route path="brands" element={<BrandManager />} />
+                <Route path="brands/:brandId/branches" element={<EnhancedBranchManager />} />
+                
+                {/* Şablonlar */}
                 <Route path="templates" element={<TemplateManager />} />
+                
+                {/* Şubeler (Tüm Markalar İçin) */}
                 <Route path="branches" element={<Branches />} />
+                
+                {/* Diğer Yönetim Sayfaları */}
                 <Route path="products" element={<Products />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="heatmap" element={<Heatmap />} />
-                
-                {/* Yeni Eklenen Rotalar */}
-                <Route path="brands/:brandId/branches" element={<EnhancedBranchManager />} />
               </Route>
               
               {/* Hem Super Admin hem de Branch Manager erişebilir */}
               <Route element={<PrivateRoute allowedRoles={["super_admin", "branch_manager"]} />}>
+                {/* Şube İşlemleri */}
                 <Route path="branch-products" element={<BranchProducts />} />
-                <Route path="orders" element={<AdminOrders />} />
                 <Route path="branches/:id/products" element={<BranchProducts />} />
-                
-                {/* Yeni Eklenen - Şube Analitiği */}
                 <Route path="branches/:branchId/analytics" element={<BranchAnalytics />} />
                 <Route path="analytics" element={<BranchAnalytics />} /> {/* Varsayılan şube analitiği */}
+                
+                {/* Siparişler */}
+                <Route path="orders" element={<AdminOrders />} />
               </Route>
             </Route>
           </Route>

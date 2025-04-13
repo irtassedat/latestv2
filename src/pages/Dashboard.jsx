@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import api from "../lib/axios"
+import { useAuth } from "../contexts/AuthContext"
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalBranches: 0,
     totalOrders: 0,
-    totalCategories: 0
+    totalCategories: 0,
+    totalBrands: 0
   })
   const [recentOrders, setRecentOrders] = useState([])
+  const [brands, setBrands] = useState([])  // Markaları tutacak state
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const { isSuperAdmin } = useAuth()
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -25,12 +29,28 @@ const Dashboard = () => {
           totalProducts: 124,
           totalBranches: 3,
           totalOrders: 856,
-          totalCategories: 8
+          totalCategories: 8,
+          totalBrands: 2
         })
 
         // Son siparişleri getir
         const ordersResponse = await api.get("/orders?limit=5")
         setRecentOrders(ordersResponse.data.slice(0, 5))
+        
+        // Sadece Super Admin için markaları getir
+        if (isSuperAdmin) {
+          try {
+            const brandsResponse = await api.get("/api/brands")
+            setBrands(brandsResponse.data.slice(0, 4)) // İlk 4 markayı göster
+          } catch(err) {
+            console.error("Markalar alınırken hata:", err)
+            // Örnek veri
+            setBrands([
+              { id: 1, name: "Çeşme Kahve", logo_url: "/logos/default-logo.png" },
+              { id: 2, name: "Deniz Cafe", logo_url: "/logos/default-logo.png" }
+            ])
+          }
+        }
       } catch (err) {
         console.error("İstatistikler yüklenirken hata:", err)
       } finally {
@@ -39,7 +59,7 @@ const Dashboard = () => {
     }
 
     fetchStats()
-  }, [])
+  }, [isSuperAdmin])
 
   // Admin paneli menü öğeleri
   const menuItems = [
@@ -50,14 +70,6 @@ const Dashboard = () => {
       color: "bg-blue-500",
       description: "Tüm ürünleri yönetin",
       features: ["Excel/PDF export", "Toplu düzenleme", "Kategori yönetimi"]
-    },
-    {
-      title: "Şube Ürünleri",
-      icon: "🏪",
-      path: "/admin/branch-products",
-      color: "bg-green-500",
-      description: "Şubelere özel ürünler",
-      features: ["Stok takibi", "Görünürlük kontrolü", "Fiyat güncellemeleri"]
     },
     {
       title: "Siparişler",
@@ -76,14 +88,6 @@ const Dashboard = () => {
       features: ["Müşteri görünümü", "Mobil uyumluluk", "Canlı test"]
     },
     {
-      title: "Isı Haritası",
-      icon: "🔥",
-      path: "/admin/heatmap",
-      color: "bg-red-500",
-      description: "Kullanıcı davranışları analizi",
-      features: ["Ürün popülaritesi", "Sayfa ziyaret analizi", "Tıklama verileri"]
-    },
-    {
       title: "Analitik",
       icon: "📊",
       path: "/admin/analytics",
@@ -92,6 +96,47 @@ const Dashboard = () => {
       features: ["Satış grafikleri", "Trend analizi", "Performans raporu"]
     },
   ]
+  
+  // Super Admin için ek menü öğeleri
+  const adminMenuItems = [
+    {
+      title: "Markalar",
+      icon: "🏢",
+      path: "/admin/brands",
+      color: "bg-pink-500",
+      description: "Tüm markaları yönetin",
+      features: ["Marka ekleme", "Şube yönetimi", "Logo düzenleme"]
+    },
+    {
+      title: "Şubeler",
+      icon: "🏪",
+      path: "/admin/branches",
+      color: "bg-green-500",
+      description: "Tüm şubeleri yönetin",
+      features: ["Şube detayları", "Stok takibi", "Konum bilgileri"]
+    },
+    {
+      title: "Şablonlar",
+      icon: "🎨",
+      path: "/admin/templates",
+      color: "bg-yellow-500",
+      description: "Şablonları özelleştirin",
+      features: ["Menü şablonları", "Fiyat şablonları", "Entegrasyonlar"]
+    },
+    {
+      title: "Kullanıcılar",
+      icon: "👥",
+      path: "/admin/users",
+      color: "bg-violet-500",
+      description: "Kullanıcıları yönetin",
+      features: ["Yetki kontrolleri", "Şifre sıfırlama", "Şube atama"]
+    },
+  ]
+
+  // Aktif menuItems'ı belirle
+  const displayMenuItems = isSuperAdmin 
+    ? [...adminMenuItems, ...menuItems]
+    : menuItems;
 
   if (loading) {
     return (
@@ -109,14 +154,25 @@ const Dashboard = () => {
           <button className="px-4 py-2 bg-[#022B45] text-white rounded-lg text-sm hover:bg-[#022B45]/80 transition shadow-sm">
             Yardım
           </button>
-          <button className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 transition shadow-sm">
+          <Link to="/admin/profile" className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 transition shadow-sm">
             Profil
-          </button>
+          </Link>
         </div>
       </div>
 
       {/* İstatistik Kartları */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        {isSuperAdmin && (
+          <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-pink-500">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-gray-500 text-sm font-medium">Toplam Marka</h3>
+              <span className="text-3xl bg-pink-100 text-pink-800 p-2 rounded-lg">🏢</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">{stats.totalBrands}</p>
+            <p className="text-xs text-gray-500 mt-1">Aktif markalar</p>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#D98A3D]">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-gray-500 text-sm font-medium">Toplam Ürün</h3>
@@ -154,10 +210,61 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Markalar Bölümü (Sadece Super Admin için) */}
+      {isSuperAdmin && brands.length > 0 && (
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Markalar</h2>
+            <Link to="/admin/brands" className="text-blue-600 text-sm hover:underline">
+              Tüm Markaları Gör →
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {brands.map(brand => (
+              <Link 
+                key={brand.id}
+                to={`/admin/brands/${brand.id}/branches`}
+                className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition border border-gray-100"
+              >
+                <div className="h-32 bg-gray-50 flex items-center justify-center p-4">
+                  <img 
+                    src={brand.logo_url || "/logos/default-logo.png"}
+                    alt={brand.name}
+                    className="max-h-full object-contain"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "/logos/default-logo.png";
+                    }}
+                  />
+                </div>
+                <div className="p-4 border-t">
+                  <h3 className="font-semibold text-base">{brand.name}</h3>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-sm text-gray-500">Şubeleri Görüntüle</span>
+                    <span className="text-blue-600">→</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+            
+            <Link 
+              to="/admin/brands"
+              className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition border border-gray-100 border-dashed flex flex-col items-center justify-center p-4 h-full"
+            >
+              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                <span className="text-2xl text-blue-600">+</span>
+              </div>
+              <p className="font-medium text-blue-600">Yeni Marka Ekle</p>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Ana Menü Kartları */}
       <h2 className="text-xl font-semibold text-gray-800 mb-4">Yönetim Araçları</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {menuItems.map((item, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        {displayMenuItems.slice(0, 8).map((item, index) => (
           <Link
             key={index}
             to={item.path}
@@ -198,7 +305,7 @@ const Dashboard = () => {
               alt="Isı Haritası Önizleme"
               className="w-full rounded-lg"
               onError={(e) => {
-                e.target.src = "/uploads/guncellenecek.jpg" // Projenin public/uploads içine bu resmi koyman yeterli
+                e.target.src = "/uploads/guncellenecek.jpg"
                 e.target.onerror = null
               }}
             />
@@ -313,12 +420,12 @@ const Dashboard = () => {
               </button>
 
               <button
-                onClick={() => navigate("/admin/heatmap")}
+                onClick={() => navigate("/admin/analytics")}
                 className="w-full flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition"
               >
                 <span className="flex items-center gap-2">
-                  <span className="text-red-600">🔥</span>
-                  <span className="font-medium">Isı Haritası Analizi</span>
+                  <span className="text-red-600">📊</span>
+                  <span className="font-medium">Analitik İncele</span>
                 </span>
                 <span className="text-gray-400">→</span>
               </button>
@@ -331,18 +438,18 @@ const Dashboard = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Yazılım Versiyonu</span>
-                <span className="font-medium">v1.2.0</span>
+                <span className="font-medium">v1.3.0</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Son Güncelleme</span>
-                <span className="font-medium">6 Nisan 2024</span>
+                <span className="font-medium">13 Nisan 2025</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">API Durumu</span>
                 <span className="font-medium text-green-600">Aktif</span>
               </div>
               <div className="mt-4 pt-3 border-t text-center">
-                <span className="text-xs text-gray-500">© 2024 Çeşme Kahve - Tüm Hakları Saklıdır</span>
+                <span className="text-xs text-gray-500">© 2025 Çeşme Kahve - Tüm Hakları Saklıdır</span>
               </div>
             </div>
           </div>

@@ -1,8 +1,8 @@
-// src/layout/MainLayout.jsx
+// src/layout/MainLayout.jsx - Improved Navigation
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
-import { FiLogOut, FiUser, FiBriefcase, FiLayers, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap } from "react-icons/fi"
+import { FiLogOut, FiUser, FiBriefcase, FiLayers, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap, FiSettings, FiMenu, FiX } from "react-icons/fi"
 import api from "../lib/axios"
 
 // Şube context'i oluştur
@@ -12,6 +12,7 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userBranches, setUserBranches] = useState([])
   const [selectedBranchId, setSelectedBranchId] = useState(null)
+  const [expandedGroup, setExpandedGroup] = useState(null);
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser, logout, isSuperAdmin, isBranchManager } = useAuth()
@@ -22,7 +23,14 @@ const MainLayout = () => {
     if (savedState !== null) {
       setSidebarOpen(JSON.parse(savedState));
     }
-  }, []);
+    
+    // URL yoluna göre hangi menü grubunun açık olacağını belirle
+    if (location.pathname.includes('/brands')) {
+      setExpandedGroup('brands');
+    } else if (location.pathname.includes('/branches')) {
+      setExpandedGroup('branches');
+    }
+  }, [location.pathname]);
 
   // Kullanıcının erişebileceği şubeleri getir
   useEffect(() => {
@@ -72,6 +80,15 @@ const MainLayout = () => {
     setSidebarOpen(newState);
     localStorage.setItem('sidebarOpen', JSON.stringify(newState));
   }
+  
+  // Menü grubunu aç/kapat
+  const toggleGroup = (group) => {
+    if (expandedGroup === group) {
+      setExpandedGroup(null);
+    } else {
+      setExpandedGroup(group);
+    }
+  };
 
   // Şube değişince session storage'a kaydet
   const handleBranchChange = (e) => {
@@ -93,33 +110,73 @@ const MainLayout = () => {
       { path: "/admin/profile", label: "Profil", icon: <FiUser size={20} /> },
     ];
 
-    // Sadece super admin'in görebileceği menü öğeleri
-    const superAdminItems = [
-      { path: "/admin/brands", label: "Markalar", icon: <FiBriefcase size={20} /> },
-      { path: "/admin/templates", label: "Şablonlar", icon: <FiLayers size={20} /> },
-      { path: "/admin/branches", label: "Şubeler", icon: <FiMap size={20} /> },
-      { path: "/admin/products", label: "Ürünler", icon: <FiPackage size={20} /> },
-      { path: "/admin/users", label: "Kullanıcılar", icon: <FiUsers size={20} /> },
-      { path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> },
-    ];
-
-    // Hem super admin hem de branch manager'ın görebileceği menü öğeleri
+    // Ana menü grupları
+    const menuGroups = [];
+    
+    // Sadece super admin'in görebileceği menü grupları
+    if (isSuperAdmin) {
+      // Marka Yönetimi Grubu
+      menuGroups.push({
+        id: "brands",
+        label: "Marka Yönetimi",
+        icon: <FiBriefcase size={20} />,
+        items: [
+          { path: "/admin/brands", label: "Tüm Markalar", icon: <FiBriefcase size={18} /> },
+          // Burada dinamik olarak son ziyaret edilen markaları gösterebilirsiniz
+        ]
+      });
+      
+      // Şablon Yönetimi
+      menuGroups.push({
+        id: "templates",
+        label: "Şablonlar",
+        icon: <FiLayers size={20} />,
+        items: [
+          { path: "/admin/templates", label: "Tüm Şablonlar", icon: <FiLayers size={18} /> },
+        ]
+      });
+      
+      // Şube Yönetimi Grubu
+      menuGroups.push({
+        id: "branches",
+        label: "Şube Yönetimi",
+        icon: <FiMap size={20} />,
+        items: [
+          { path: "/admin/branches", label: "Tüm Şubeler", icon: <FiMap size={18} /> },
+          // Burada dinamik olarak son ziyaret edilen şubeleri gösterebilirsiniz
+        ]
+      });
+      
+      // Kullanıcı Yönetimi
+      menuGroups.push({
+        id: "users",
+        label: "Kullanıcılar",
+        icon: <FiUsers size={20} />,
+        items: [
+          { path: "/admin/users", label: "Kullanıcı Yönetimi", icon: <FiUsers size={18} /> },
+        ]
+      });
+    }
+    
+    // Başka gruplar eklenebilir
+    
+    // Diğer Menü Öğeleri - Hem Super Admin hem de Branch Manager için
     const sharedItems = [
       { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
       { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
-      { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> }, // Yeni eklenen
+      { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> },
       { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },
     ];
-
-    // Rol bazlı menü öğelerini birleştir
+    
+    // Sadece Super Admin için Isı Haritası
     if (isSuperAdmin) {
-      return [...baseMenuItems, ...superAdminItems, ...sharedItems];
-    } else {
-      return [...baseMenuItems, ...sharedItems];
+      sharedItems.push({ path: "/admin/heatmap", label: "Isı Haritası", icon: <FiTrendingUp size={20} /> });
     }
+
+    return { baseMenuItems, menuGroups, sharedItems };
   };
 
-  const menuItems = getMenuItems();
+  const { baseMenuItems, menuGroups, sharedItems } = getMenuItems();
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -141,7 +198,7 @@ const MainLayout = () => {
               onClick={toggleSidebar}
               className="text-white/80 hover:text-white"
             >
-              {sidebarOpen ? "◀" : "▶"}
+              {sidebarOpen ? <FiX size={20} /> : <FiMenu size={20} />}
             </button>
           </div>
 
@@ -166,11 +223,14 @@ const MainLayout = () => {
             <div className="px-4 mb-2 text-xs text-white/50 uppercase">
               {sidebarOpen ? "Menü" : ""}
             </div>
-            {menuItems.map((item) => (
+            
+            {/* Ana Menü Öğeleri */}
+            {baseMenuItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center py-3 px-4 transition-colors ${location.pathname === item.path
+                className={`flex items-center py-3 px-4 transition-colors ${
+                  location.pathname === item.path
                     ? "bg-[#D98A3D] text-white"
                     : "text-white/80 hover:bg-[#D98A3D]/30"
                   } ${!sidebarOpen ? "justify-center" : ""}`}
@@ -179,6 +239,82 @@ const MainLayout = () => {
                 {sidebarOpen && <span className="ml-3 text-sm">{item.label}</span>}
               </Link>
             ))}
+            
+            {/* Menü Grupları - Sadece sidebarOpen ise göster */}
+            {sidebarOpen && menuGroups.length > 0 && (
+              <div className="mt-4">
+                <div className="px-4 mb-2 text-xs text-white/50 uppercase">
+                  Yönetim
+                </div>
+                
+                {menuGroups.map(group => (
+                  <div key={group.id} className="mb-1">
+                    {/* Grup Başlığı */}
+                    <button
+                      onClick={() => toggleGroup(group.id)}
+                      className={`w-full flex items-center justify-between py-3 px-4 transition-colors
+                        ${expandedGroup === group.id ? "bg-[#034368]" : "hover:bg-[#034368]/50"}
+                        text-white/90`}
+                    >
+                      <div className="flex items-center">
+                        <span className="text-lg">{group.icon}</span>
+                        <span className="ml-3 text-sm">{group.label}</span>
+                      </div>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${expandedGroup === group.id ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    
+                    {/* Grup İçeriği */}
+                    {expandedGroup === group.id && (
+                      <div className="bg-[#011e30]">
+                        {group.items.map(item => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`flex items-center py-2 px-4 pl-12 transition-colors ${
+                              location.pathname === item.path
+                                ? "bg-[#D98A3D]/70 text-white"
+                                : "text-white/70 hover:bg-[#D98A3D]/20"
+                            }`}
+                          >
+                            <span className="text-lg">{item.icon}</span>
+                            <span className="ml-3 text-sm">{item.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Tek Düzey Menü Öğeleri */}
+            <div className="mt-4">
+              <div className="px-4 mb-2 text-xs text-white/50 uppercase">
+                {sidebarOpen ? (menuGroups.length > 0 ? "İşlemler" : "Menü") : ""}
+              </div>
+              
+              {sharedItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center py-3 px-4 transition-colors ${
+                    location.pathname === item.path
+                      ? "bg-[#D98A3D] text-white"
+                      : "text-white/80 hover:bg-[#D98A3D]/30"
+                    } ${!sidebarOpen ? "justify-center" : ""}`}
+                >
+                  <span className="text-lg">{item.icon}</span>
+                  {sidebarOpen && <span className="ml-3 text-sm">{item.label}</span>}
+                </Link>
+              ))}
+            </div>
           </nav>
 
           {/* Footer */}
@@ -202,8 +338,11 @@ const MainLayout = () => {
         <header className="bg-white shadow-sm">
           <div className="flex justify-between items-center px-6 py-4">
             <div className="text-xl font-semibold text-gray-800">
-              {/* Aktif sayfanın başlığını göster */}
-              {menuItems.find((item) => item.path === location.pathname)?.label || "Yönetim Paneli"}
+              {/* Aktif sayfanın başlığını göster - menü gruplarını da kontrol et */}
+              {baseMenuItems.find((item) => item.path === location.pathname)?.label || 
+               menuGroups.flatMap(group => group.items).find(item => item.path === location.pathname)?.label ||
+               sharedItems.find((item) => item.path === location.pathname)?.label || 
+               "Yönetim Paneli"}
             </div>
 
             <div className="flex items-center gap-4">
