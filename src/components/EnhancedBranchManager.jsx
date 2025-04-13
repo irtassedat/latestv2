@@ -75,7 +75,8 @@ const EnhancedBranchManager = () => {
 
                 // Markaya ait şubeleri getir
                 const branchesResponse = await api.get(`/api/brands/${brandId}/branches`);
-                setBranches(branchesResponse.data);
+                // API yanıtı yapısına göre uygun veriyi al
+                setBranches(branchesResponse.data.branches || branchesResponse.data || []);
             } else {
                 // Tüm şubeleri getir (marka belirtilmemişse)
                 const branchesResponse = await api.get("/api/branches");
@@ -308,15 +309,16 @@ const EnhancedBranchManager = () => {
         }
     };
 
-    // Filtreleme işlemleri
-    const filteredBranches = branches.filter(branch => {
-        return (
-            branch.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            branch.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            branch.manager_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            branch.branch_code?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    });
+    const filteredBranches = Array.isArray(branches)
+        ? branches.filter(branch => {
+            return (
+                branch.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                branch.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                branch.manager_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                branch.branch_code?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        })
+        : [];
 
     // Şube detayına git
     const handleGoToProducts = (branchId) => {
