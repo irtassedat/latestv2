@@ -290,48 +290,7 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Isı Haritası Önizleme */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Kullanıcı Davranış Analizi</h2>
-          <Link to="/admin/heatmap" className="text-blue-600 text-sm hover:underline">
-            Detaylı Rapor →
-          </Link>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-          <div className="relative">
-            <img
-              src="/analytics/heatmap-preview.jpg"
-              alt="Isı Haritası Önizleme"
-              className="w-full rounded-lg"
-              onError={(e) => {
-                e.target.src = "/uploads/guncellenecek.jpg"
-                e.target.onerror = null
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-4">
-              <div className="text-white">
-                <h3 className="font-bold">Popüler İçerikler</h3>
-                <p className="text-sm">Kahveler ve Tatlılar kategorilerinde yoğunlaşma</p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <h4 className="font-medium text-sm">En Çok Tıklanan</h4>
-              <p className="text-xl font-bold text-[#D98A3D]">Türk Kahvesi</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <h4 className="font-medium text-sm">Sayfa Kalma Süresi</h4>
-              <p className="text-xl font-bold text-[#D98A3D]">2.4 dk</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <h4 className="font-medium text-sm">Dönüşüm Oranı</h4>
-              <p className="text-xl font-bold text-[#D98A3D]">%18.5</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       {/* Son Siparişler ve Hızlı İşlemler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

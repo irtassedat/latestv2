@@ -1,13 +1,15 @@
 // src/pages/BrandManager.jsx
 import React from "react";
 import BrandManagerComponent from "../components/BrandManager";
+import EnhancedBrandManager from "../components/EnhancedBrandManager";
 
-const BrandManager = () => {
+
+const EnhancedBrandManagerPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
-      <BrandManagerComponent />
+      <EnhancedBrandManager />
     </div>
   );
 };
 
-export default BrandManager;
+export default EnhancedBrandManagerPage;
