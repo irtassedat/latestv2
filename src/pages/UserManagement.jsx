@@ -1,6 +1,7 @@
-// src/pages/UserManagement.jsx
+// src/pages/UserManagement.jsx - Brands.map hatası düzeltildi
 import { useState, useEffect } from "react";
-import { FiEdit2, FiTrash2, FiPlus, FiUserPlus, FiKey, FiUser, FiMail, FiLock, FiSearch, FiFilter, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiInfo } from "react-icons/fi";
+import { FiEdit2, FiTrash2, FiPlus, FiUserPlus, FiKey, FiUser, FiMail, FiLock, FiSearch, 
+  FiFilter, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiInfo, FiBriefcase } from "react-icons/fi";
 import api from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,16 +12,18 @@ const UserManagement = () => {
   const { isSuperAdmin } = useAuth();
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [brands, setBrands] = useState([]); // Markalar için state
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState(""); 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // "grid" veya "table"
+  const [viewMode, setViewMode] = useState("grid"); 
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
   
@@ -30,6 +33,7 @@ const UserManagement = () => {
     password: "",
     role: "branch_manager",
     branch_id: "",
+    brand_id: "",
     is_active: true,
     phone: "", 
     full_name: ""
@@ -40,18 +44,47 @@ const UserManagement = () => {
     confirmPassword: ""
   });
 
-  // Şubeleri ve kullanıcıları getir
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Paralel olarak şube ve kullanıcı verilerini getir
-      const [branchesRes, usersRes] = await Promise.all([
-        api.get("/api/branches"),
-        api.get("/api/users")
-      ]);
-      
-      setBranches(branchesRes.data);
+      // Kullanıcıları getir
+      const usersRes = await api.get("/api/users");
       setUsers(usersRes.data);
+      
+      try {
+        // Şubeleri getir
+        const branchesRes = await api.get("/api/branches");
+        setBranches(Array.isArray(branchesRes.data) ? branchesRes.data : []);
+      } catch (branchError) {
+        console.error("Şubeler yüklenirken hata:", branchError);
+        setBranches([]);
+      }
+      
+      try {
+        // Markaları getir - brands.js dosyanızın döndürdüğü yapıya göre düzenleyin
+        const brandsRes = await api.get("/api/brands");
+        
+        // API'nizin döndürdüğü yanıt yapısına göre veriyi işleyin
+        let brandsArray = [];
+        
+        if (Array.isArray(brandsRes.data)) {
+          // Doğrudan dizi döndürüyorsa
+          brandsArray = brandsRes.data;
+        } else if (brandsRes.data && brandsRes.data.data && Array.isArray(brandsRes.data.data)) {
+          // { data: [...] } şeklinde bir yapı döndürüyorsa
+          brandsArray = brandsRes.data.data;
+        } else if (brandsRes.data && Object.keys(brandsRes.data).length > 0) {
+          // Başka bir yapıda veri döndürüyorsa console'a yazdırıp inceleyin
+          console.log("API Yanıt Yapısı:", brandsRes.data);
+          brandsArray = []; // En kötü durumda boş dizi
+        }
+        
+        console.log("Markalar başarıyla yüklendi:", brandsArray);
+        setBrands(brandsArray);
+      } catch (brandError) {
+        console.error("Markalar yüklenirken hata:", brandError);
+        setBrands([]);
+      }
     } catch (error) {
       console.error("Veriler yüklenirken hata:", error);
       toast.error("Veriler yüklenemedi!");
@@ -64,6 +97,29 @@ const UserManagement = () => {
     fetchData();
   }, []);
 
+  // Marka değiştiğinde ilgili şubeleri getir
+  const fetchBranchesByBrand = async (brandId) => {
+    if (!brandId) {
+      fetchData(); // Tüm şubeleri yükle
+      return;
+    }
+    
+    try {
+      const response = await api.get(`/api/brands/${brandId}/branches`);
+      // API yanıtının yapısını kontrol et
+      const branchesArray = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data && Array.isArray(response.data.branches) 
+            ? response.data.branches 
+            : []);
+      setBranches(branchesArray);
+    } catch (error) {
+      console.error("Şubeler yüklenirken hata:", error);
+      toast.error("Şubeler yüklenemedi!");
+      setBranches([]);
+    }
+  };
+
   // Form değişikliklerini izle
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -71,14 +127,28 @@ const UserManagement = () => {
     // Checkbox için checked değerini, diğerleri için value değerini kullan
     const inputValue = type === 'checkbox' ? checked : value;
     
-    // Role değiştiğinde super_admin seçilirse branch_id'yi boşalt
+    // Role değiştiğinde super_admin seçilirse branch_id ve brand_id'yi boşalt
     if (name === 'role' && value === 'super_admin') {
+      setForm(prevForm => ({
+        ...prevForm,
+        [name]: value,
+        branch_id: '',
+        brand_id: ''
+      }));
+    } 
+    // Marka değiştiğinde şubeleri güncelle ve mevcut şube seçimini sıfırla
+    else if (name === 'brand_id') {
       setForm(prevForm => ({
         ...prevForm,
         [name]: value,
         branch_id: ''
       }));
-    } else {
+      
+      if (value) {
+        fetchBranchesByBrand(value);
+      }
+    }
+    else {
       setForm(prevForm => ({ ...prevForm, [name]: inputValue }));
     }
   };
@@ -100,10 +170,16 @@ const UserManagement = () => {
         password: "", // Düzenlerken şifre alanını boş bırak
         role: user.role || "branch_manager",
         branch_id: user.branch_id || "",
+        brand_id: user.brand_id || "",
         is_active: user.is_active !== false, // undefined veya null ise true kabul et
         phone: user.phone || "",
         full_name: user.full_name || ""
       });
+      
+      // Eğer marka ID'si varsa, o markaya ait şubeleri getir
+      if (user.brand_id) {
+        fetchBranchesByBrand(user.brand_id);
+      }
     } else {
       // Ekleme modu
       setSelectedUser(null);
@@ -113,10 +189,14 @@ const UserManagement = () => {
         password: "",
         role: "branch_manager",
         branch_id: "",
+        brand_id: "",
         is_active: true,
         phone: "",
         full_name: ""
       });
+      
+      // Tüm şubeleri yükle
+      fetchData();
     }
     
     setShowModal(true);
@@ -156,10 +236,17 @@ const UserManagement = () => {
       return false;
     }
     
-    // Branch Manager için şube seçimi zorunlu
-    if (form.role === "branch_manager" && !form.branch_id) {
-      toast.error("Şube Yöneticisi için şube seçimi zorunludur");
-      return false;
+    // Branch Manager için şube ve marka seçimi zorunlu
+    if (form.role === "branch_manager") {
+      if (!form.brand_id) {
+        toast.error("Şube Yöneticisi için marka seçimi zorunludur");
+        return false;
+      }
+      
+      if (!form.branch_id) {
+        toast.error("Şube Yöneticisi için şube seçimi zorunludur");
+        return false;
+      }
     }
     
     return true;
@@ -262,6 +349,7 @@ const UserManagement = () => {
       'E-posta': user.email,
       'Telefon': user.phone || '',
       'Rol': user.role === 'super_admin' ? 'Süper Admin' : 'Şube Yöneticisi',
+      'Marka': user.brand_name || '',
       'Şube': user.branch_name || '',
       'Durum': user.is_active ? 'Aktif' : 'Pasif',
       'Son Giriş': user.last_login ? new Date(user.last_login).toLocaleString() : ''
@@ -283,11 +371,15 @@ const UserManagement = () => {
     const matchesSearch = 
       user.username?.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower) ||
-      user.branch_name?.toLowerCase().includes(searchLower) ||
-      (user.full_name?.toLowerCase().includes(searchLower));
+      (user.branch_name?.toLowerCase() || '').includes(searchLower) ||
+      (user.brand_name?.toLowerCase() || '').includes(searchLower) ||
+      (user.full_name?.toLowerCase() || '').includes(searchLower);
 
     // Şube filtresi 
     const matchesBranch = !branchFilter || user.branch_id === branchFilter;
+    
+    // Marka filtresi
+    const matchesBrand = !brandFilter || user.brand_id === brandFilter;
     
     // Rol filtresi
     const matchesRole = !roleFilter || user.role === roleFilter;
@@ -297,8 +389,20 @@ const UserManagement = () => {
       (statusFilter === "active" && user.is_active) || 
       (statusFilter === "inactive" && !user.is_active);
     
-    return matchesSearch && matchesBranch && matchesRole && matchesStatus;
+    return matchesSearch && matchesBranch && matchesBrand && matchesRole && matchesStatus;
   });
+
+  // Marka değiştiğinde o markaya ait şubeleri getir (filtre için)
+  useEffect(() => {
+    if (brandFilter) {
+      fetchBranchesByBrand(brandFilter);
+      // Eğer marka değiştiyse şube filtresini sıfırla
+      setBranchFilter("");
+    } else {
+      // Tüm şubeleri yükle
+      fetchData();
+    }
+  }, [brandFilter]);
 
   // Super Admin değilse dashboard'a yönlendir
   if (!isSuperAdmin) {
@@ -372,7 +476,7 @@ const UserManagement = () => {
         </div>
         
         {/* Filtreler Satırı */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           {/* Arama kutusu */}
           <div className="relative">
             <input
@@ -385,6 +489,23 @@ const UserManagement = () => {
             <FiSearch className="absolute left-2 top-2.5 text-gray-400" size={18} />
           </div>
           
+          {/* Marka filtresi - YENİ */}
+          <div className="relative">
+            <select
+              value={brandFilter}
+              onChange={e => setBrandFilter(e.target.value)}
+              className="w-full p-2 pl-8 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Tüm Markalar</option>
+              {Array.isArray(brands) && brands.map(brand => (
+                <option key={brand.id} value={brand.id}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+            <FiBriefcase className="absolute left-2 top-2.5 text-gray-400" size={18} />
+          </div>
+          
           {/* Şube filtresi */}
           <div className="relative">
             <select
@@ -393,7 +514,7 @@ const UserManagement = () => {
               className="w-full p-2 pl-8 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Tüm Şubeler</option>
-              {branches.map(branch => (
+              {Array.isArray(branches) && branches.map(branch => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
                 </option>
@@ -448,13 +569,14 @@ const UserManagement = () => {
               Kullanıcı Bulunamadı
             </h3>
             <p className="mb-4 text-gray-500">
-              {searchTerm || branchFilter || roleFilter || statusFilter !== "" ? "Arama ve filtre kriterlerinize uygun kullanıcı bulunmamaktadır." : "Henüz hiç kullanıcı eklenmemiş."}
+              {searchTerm || branchFilter || brandFilter || roleFilter || statusFilter !== "" ? "Arama ve filtre kriterlerinize uygun kullanıcı bulunmamaktadır." : "Henüz hiç kullanıcı eklenmemiş."}
             </p>
-            {(searchTerm || branchFilter || roleFilter || statusFilter !== "") && (
+            {(searchTerm || branchFilter || brandFilter || roleFilter || statusFilter !== "") && (
               <button
                 onClick={() => {
                   setSearchTerm("");
                   setBranchFilter("");
+                  setBrandFilter("");
                   setRoleFilter("");
                   setStatusFilter("");
                 }}
@@ -476,6 +598,9 @@ const UserManagement = () => {
                     Rol
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Marka
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Şube
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -492,7 +617,7 @@ const UserManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 rounded-full bg-[#022B45] text-white flex items-center justify-center">
-                          {user.username.charAt(0).toUpperCase()}
+                          {(user.username || '').charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{user.username}</div>
@@ -508,6 +633,9 @@ const UserManagement = () => {
                       }`}>
                         {user.role === 'super_admin' ? 'Süper Admin' : 'Şube Yöneticisi'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.brand_name || (user.role === 'super_admin' ? 'Tüm Markalar' : 'Atanmamış')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.branch_name || (user.role === 'super_admin' ? 'Tüm Şubeler' : 'Atanmamış')}
@@ -572,7 +700,7 @@ const UserManagement = () => {
                 <div className="p-5">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="h-14 w-14 rounded-full bg-[#022B45] text-white flex items-center justify-center text-xl font-semibold">
-                      {user.username.charAt(0).toUpperCase()}
+                      {(user.username || '').charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-1">{user.username}</h3>
@@ -590,6 +718,12 @@ const UserManagement = () => {
                       }`}>
                         {user.role === 'super_admin' ? 'Süper Admin' : 'Şube Yöneticisi'}
                       </span>
+                    </div>
+                    
+                    {/* YENİ: Marka bilgisi eklendi */}
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500">Marka:</span>
+                      <span className="font-medium">{user.brand_name || (user.role === 'super_admin' ? 'Tüm Markalar' : 'Atanmamış')}</span>
                     </div>
                     
                     <div className="flex justify-between items-center text-sm">
@@ -792,6 +926,33 @@ const UserManagement = () => {
                   </select>
                 </div>
                 
+                {/* YENİ: Marka seçimi eklendi */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Marka {form.role === 'branch_manager' ? '*' : ''}
+                  </label>
+                  <select
+                    name="brand_id"
+                    value={form.brand_id}
+                    onChange={handleFormChange}
+                    className={`w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      form.role === 'branch_manager' && !form.brand_id ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    required={form.role === 'branch_manager'}
+                    disabled={form.role === 'super_admin'}
+                  >
+                    <option value="">Marka Seçin</option>
+                    {Array.isArray(brands) && brands.map(brand => (
+                      <option key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </option>
+                    ))}
+                  </select>
+                  {form.role === 'branch_manager' && !form.brand_id && (
+                    <p className="mt-1 text-xs text-red-500">Şube Yöneticisi için marka seçimi zorunludur.</p>
+                  )}
+                </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Şube {form.role === 'branch_manager' ? '*' : ''}
@@ -804,10 +965,10 @@ const UserManagement = () => {
                       form.role === 'branch_manager' && !form.branch_id ? 'border-red-300' : 'border-gray-300'
                     }`}
                     required={form.role === 'branch_manager'}
-                    disabled={form.role === 'super_admin'}
+                    disabled={form.role === 'super_admin' || !form.brand_id}
                   >
                     <option value="">Şube Seçin</option>
-                    {branches.map(branch => (
+                    {Array.isArray(branches) && branches.map(branch => (
                       <option key={branch.id} value={branch.id}>
                         {branch.name}
                       </option>
@@ -816,7 +977,10 @@ const UserManagement = () => {
                   {form.role === 'super_admin' && (
                     <p className="mt-1 text-xs text-gray-500">Süper Admin tüm şubelere erişebilir, şube seçimine gerek yoktur.</p>
                   )}
-                  {form.role === 'branch_manager' && !form.branch_id && (
+                  {form.role === 'branch_manager' && !form.brand_id && (
+                    <p className="mt-1 text-xs text-gray-500">Önce marka seçmelisiniz.</p>
+                  )}
+                  {form.role === 'branch_manager' && form.brand_id && !form.branch_id && (
                     <p className="mt-1 text-xs text-red-500">Şube Yöneticisi için şube seçimi zorunludur.</p>
                   )}
                 </div>
@@ -965,7 +1129,7 @@ const UserManagement = () => {
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">
                 <div className="h-16 w-16 rounded-full bg-[#022B45] text-white flex items-center justify-center text-2xl font-semibold">
-                  {selectedUserInfo.username.charAt(0).toUpperCase()}
+                  {(selectedUserInfo.username || '').charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h4 className="text-xl font-semibold text-gray-900">{selectedUserInfo.full_name || selectedUserInfo.username}</h4>
@@ -990,6 +1154,12 @@ const UserManagement = () => {
                   </div>
                 </div>
                 
+                {/* YENİ: Marka bilgisi eklendi */}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Marka</p>
+                  <p className="font-medium">{selectedUserInfo.brand_name || (selectedUserInfo.role === 'super_admin' ? 'Tüm Markalar' : 'Atanmamış')}</p>
+                </div>
+                
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Şube</p>
                   <p className="font-medium">{selectedUserInfo.branch_name || (selectedUserInfo.role === 'super_admin' ? 'Tüm Şubeler' : 'Atanmamış')}</p>
@@ -997,7 +1167,7 @@ const UserManagement = () => {
                 
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Hesap Oluşturulma</p>
-                  <p className="font-medium">{new Date(selectedUserInfo.created_at).toLocaleString()}</p>
+                  <p className="font-medium">{selectedUserInfo.created_at ? new Date(selectedUserInfo.created_at).toLocaleString() : '-'}</p>
                 </div>
               </div>
               
@@ -1008,8 +1178,6 @@ const UserManagement = () => {
                   <span className="text-gray-500">Son Giriş:</span>
                   <span>{selectedUserInfo.last_login ? new Date(selectedUserInfo.last_login).toLocaleString() : 'Hiç giriş yapmadı'}</span>
                 </div>
-                
-                {/* İsteğe bağlı diğer etkinlik verileri ileride eklenebilir */}
               </div>
               
               <div className="border-t mt-6 pt-4 flex gap-2">
