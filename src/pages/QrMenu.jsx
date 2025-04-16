@@ -157,6 +157,7 @@ const QrMenu = () => {
   }, [isCartOpen, showFilterModal, isMenuOpen])
 
   // Şubeye ait ürünleri getir
+  // QrMenu.jsx içinde fetchBranchMenu fonksiyonu
   const fetchBranchMenu = async (branch_id) => {
     if (!branch_id) {
       console.log("Şube ID'si belirtilmedi, varsayılan şube ürünleri getiriliyor");
@@ -167,9 +168,9 @@ const QrMenu = () => {
           const defaultBranchId = branchesResponse.data[0].id;
           console.log(`Varsayılan şube ID'si: ${defaultBranchId}`);
 
-          // Varsayılan şubenin ürünlerini getir
-          const productsResponse = await api.get(`/api/branches/${defaultBranchId}/products`);
-          setProducts(productsResponse.data);
+          // Varsayılan şubenin menüsünü getir (şablon bazlı)
+          const productsResponse = await api.get(`/api/branches/${defaultBranchId}/menu`);
+          setProducts(productsResponse.data.products);
 
           // URL'i güncelle (sayfa yenilenmez)
           navigate(`/menu/${defaultBranchId}`, { replace: true });
@@ -182,12 +183,13 @@ const QrMenu = () => {
     }
 
     try {
-      console.log(`${branch_id} ID'li şubenin ürünleri getiriliyor...`);
-      const response = await api.get(`/api/branches/${branch_id}/products`);
+      console.log(`${branch_id} ID'li şubenin menüsü getiriliyor...`);
+      // Şubenin menüsünü şablon bazlı olarak getir
+      const response = await api.get(`/api/branches/${branch_id}/menu`);
 
-      if (response.data && response.data.length > 0) {
-        console.log(`${response.data.length} ürün başarıyla yüklendi`);
-        setProducts(response.data);
+      if (response.data && response.data.products && response.data.products.length > 0) {
+        console.log(`${response.data.products.length} ürün başarıyla yüklendi`);
+        setProducts(response.data.products);
       } else {
         console.warn("Şube için ürün bulunamadı:", branch_id);
         loadFallbackProducts();

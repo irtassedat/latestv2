@@ -41,22 +41,22 @@ const TemplateManager = () => {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
-  
+
   const [currentType, setCurrentType] = useState(templateTypes.MENU);
-  
+
   const [menuForm, setMenuForm] = useState({
     name: "",
     description: "",
     is_active: true
   });
-  
+
   const [priceForm, setPriceForm] = useState({
     name: "",
     description: "",
     is_active: true,
     year: new Date().getFullYear()
   });
-  
+
   const [integrationForm, setIntegrationForm] = useState({
     name: "",
     type: "delivery",
@@ -79,7 +79,7 @@ const TemplateManager = () => {
         api.get("/api/templates/price"),
         api.get("/api/integrations")
       ]);
-      
+
       setTemplates({
         [templateTypes.MENU]: menuRes.data,
         [templateTypes.PRICE]: priceRes.data,
@@ -103,17 +103,17 @@ const TemplateManager = () => {
     const inputValue = type === 'checkbox' ? checked : value;
     setMenuForm({ ...menuForm, [name]: inputValue });
   };
-  
+
   const handlePriceFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const inputValue = type === 'checkbox' ? checked : value;
     setPriceForm({ ...priceForm, [name]: inputValue });
   };
-  
+
   const handleIntegrationFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const inputValue = type === 'checkbox' ? checked : value;
-    
+
     if (name.startsWith('config.')) {
       // Config alt nesnesi için değişiklik
       const configKey = name.split('.')[1];
@@ -132,11 +132,11 @@ const TemplateManager = () => {
   // Şablon ekleme/düzenleme modalını aç
   const handleAddEditTemplate = (template = null, type) => {
     setCurrentType(type);
-    
+
     if (template) {
       // Düzenleme modu
       setEditingTemplate(template);
-      
+
       if (type === templateTypes.MENU) {
         setMenuForm({
           name: template.name || "",
@@ -171,7 +171,7 @@ const TemplateManager = () => {
     } else {
       // Ekleme modu
       setEditingTemplate(null);
-      
+
       if (type === templateTypes.MENU) {
         setMenuForm({
           name: "",
@@ -209,21 +209,21 @@ const TemplateManager = () => {
   // Form gönderimi
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       let response;
       let formData;
       let endpoint;
-      
+
       if (currentType === templateTypes.MENU) {
         formData = menuForm;
         endpoint = "/api/templates/menu";
-      } 
+      }
       else if (currentType === templateTypes.PRICE) {
         formData = priceForm;
         endpoint = "/api/templates/price";
       }
-      
+
       if (editingTemplate) {
         // Var olan şablonu güncelle
         response = await api.put(`${endpoint}/${editingTemplate.id}`, formData);
@@ -233,26 +233,26 @@ const TemplateManager = () => {
         response = await api.post(endpoint, formData);
         toast.success(`${formData.name} şablonu başarıyla eklendi`);
       }
-      
+
       // Şablonları yeniden yükle
       fetchTemplates();
-      
+
       // Modalı kapat
       setShowModal(false);
-      
+
     } catch (error) {
       console.error("Form gönderilirken hata:", error);
       toast.error("İşlem başarısız oldu!");
     }
   };
-  
+
   // Entegrasyon formu gönderimi
   const handleIntegrationSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       let response;
-      
+
       if (editingTemplate) {
         // Var olan entegrasyonu güncelle
         response = await api.put(`/api/integrations/${editingTemplate.id}`, integrationForm);
@@ -262,13 +262,13 @@ const TemplateManager = () => {
         response = await api.post("/api/integrations", integrationForm);
         toast.success(`${integrationForm.name} entegrasyonu başarıyla eklendi`);
       }
-      
+
       // Şablonları yeniden yükle
       fetchTemplates();
-      
+
       // Modalı kapat
       setShowIntegrationModal(false);
-      
+
     } catch (error) {
       console.error("Entegrasyon formu gönderilirken hata:", error);
       toast.error("İşlem başarısız oldu!");
@@ -279,25 +279,25 @@ const TemplateManager = () => {
   const handleDelete = async (templateId, type) => {
     try {
       let endpoint;
-      
+
       if (type === templateTypes.MENU) {
         endpoint = "/api/templates/menu";
-      } 
+      }
       else if (type === templateTypes.PRICE) {
         endpoint = "/api/templates/price";
       }
       else if (type === templateTypes.INTEGRATION) {
         endpoint = "/api/integrations";
       }
-      
+
       await api.delete(`${endpoint}/${templateId}`);
-      
+
       // Şablonları güncelle
       setTemplates(prev => ({
         ...prev,
         [type]: prev[type].filter(template => template.id !== templateId)
       }));
-      
+
       toast.success("Şablon başarıyla silindi");
       setConfirmDelete(null); // Silme onay penceresini kapat
     } catch (error) {
@@ -319,11 +319,118 @@ const TemplateManager = () => {
   // Tab değişikliğini izle
   const handleTabChange = (index) => {
     setActiveTab(index);
-    
+
     // Tab değiştiğinde şablon türünü güncelle
     if (index === 0) setCurrentType(templateTypes.MENU);
     else if (index === 1) setCurrentType(templateTypes.PRICE);
     else if (index === 2) setCurrentType(templateTypes.INTEGRATION);
+  };
+
+  // Menü şablonundaki ürünleri yönetme fonksiyonu
+  const handleManageMenuProducts = async (templateId) => {
+    setLoading(true);
+    try {
+      // Şablondaki ürünleri getir
+      const response = await api.get(`/api/templates/menu/${templateId}/products`);
+      const products = response.data;
+
+      // Ürün yönetim modalını aç
+      setTemplateProducts(products);
+      setCurrentTemplateId(templateId);
+      setShowProductManagementModal(true);
+    } catch (error) {
+      console.error("Şablon ürünleri yüklenirken hata:", error);
+      toast.error("Şablon ürünleri yüklenemedi!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fiyat şablonundaki ürünleri yönetme fonksiyonu
+  const handleManagePriceProducts = async (templateId) => {
+    setLoading(true);
+    try {
+      // Şablondaki ürün fiyatlarını getir
+      const response = await api.get(`/api/templates/price/${templateId}/products`);
+      const products = response.data;
+
+      // Fiyat yönetim modalını aç
+      setTemplatePriceProducts(products);
+      setCurrentTemplateId(templateId);
+      setShowPriceManagementModal(true);
+    } catch (error) {
+      console.error("Şablon ürün fiyatları yüklenirken hata:", error);
+      toast.error("Şablon ürün fiyatları yüklenemedi!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Excel import fonksiyonu - Menü şablonu için
+  const handleMenuTemplateExcelImport = async (excelData, templateId) => {
+    try {
+      // Excel verilerini API'ye gönder
+      await api.post(`/api/templates/menu/${templateId}/products/batch`, excelData);
+      toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
+
+      // Güncel ürünleri yeniden yükle
+      handleManageMenuProducts(templateId);
+    } catch (error) {
+      console.error("Excel içe aktarılırken hata:", error);
+      toast.error("Menü şablonu ürünleri içe aktarılamadı");
+    }
+  };
+
+  // Excel export fonksiyonu - Menü şablonu için
+  const handleMenuTemplateExcelExport = (templateId) => {
+    api.get(`/api/templates/menu/${templateId}/products`).then(response => {
+      const products = response.data;
+
+      // Excel için data hazırla
+      const excelData = products.map(product => ({
+        "Ürün Adı": product.name,
+        "Kategori": product.category_name,
+        "Görünür": product.is_visible ? "Evet" : "Hayır",
+        "Açıklama": product.description || "",
+        "Ürün ID": product.id
+      }));
+
+      // Excel'e aktar
+      exportToExcel(excelData, `menu_template_${templateId}`);
+    });
+  };
+
+  // Excel import fonksiyonu - Fiyat şablonu için
+  const handlePriceTemplateExcelImport = async (excelData, templateId) => {
+    try {
+      // Excel verilerini API'ye gönder
+      await api.post(`/api/templates/price/${templateId}/products/batch`, excelData);
+      toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
+
+      // Güncel ürünleri yeniden yükle
+      handleManagePriceProducts(templateId);
+    } catch (error) {
+      console.error("Excel içe aktarılırken hata:", error);
+      toast.error("Fiyat şablonu ürünleri içe aktarılamadı");
+    }
+  };
+
+  // Excel export fonksiyonu - Fiyat şablonu için
+  const handlePriceTemplateExcelExport = (templateId) => {
+    api.get(`/api/templates/price/${templateId}/products`).then(response => {
+      const products = response.data;
+
+      // Excel için data hazırla
+      const excelData = products.map(product => ({
+        "Ürün Adı": product.name,
+        "Kategori": product.category_name,
+        "Fiyat (TL)": product.template_price || product.price || 0,
+        "Ürün ID": product.id
+      }));
+
+      // Excel'e aktar
+      exportToExcel(excelData, `price_template_${templateId}`);
+    });
   };
 
   return (
@@ -331,7 +438,7 @@ const TemplateManager = () => {
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <h1 className="text-2xl font-bold" style={{ color: theme.primary }}>Şablon Yönetimi</h1>
-          
+
           <div className="flex flex-col md:flex-row gap-4">
             {/* Arama kutusu */}
             <div className="relative w-full md:w-64">
@@ -341,20 +448,20 @@ const TemplateManager = () => {
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
-                style={{ 
+                style={{
                   borderColor: "rgba(2, 43, 69, 0.2)",
                   boxShadow: "0 1px 3px rgba(2, 43, 69, 0.1)"
                 }}
               />
-              <HiOutlineDocumentSearch 
-                className="absolute left-2 top-2.5" 
-                size={20} 
-                style={{ color: theme.primary }} 
+              <HiOutlineDocumentSearch
+                className="absolute left-2 top-2.5"
+                size={20}
+                style={{ color: theme.primary }}
               />
             </div>
           </div>
         </div>
-        
+
         {/* Tablar */}
         <div className="mb-6">
           <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
@@ -362,8 +469,8 @@ const TemplateManager = () => {
               <Tab
                 className={({ selected }) =>
                   `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
-                  ${selected 
-                    ? 'bg-white text-blue-600 shadow' 
+                  ${selected
+                    ? 'bg-white text-blue-600 shadow'
                     : 'text-gray-500 hover:bg-white/[0.12] hover:text-blue-600'
                   }`
                 }
@@ -373,8 +480,8 @@ const TemplateManager = () => {
               <Tab
                 className={({ selected }) =>
                   `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
-                  ${selected 
-                    ? 'bg-white text-blue-600 shadow' 
+                  ${selected
+                    ? 'bg-white text-blue-600 shadow'
                     : 'text-gray-500 hover:bg-white/[0.12] hover:text-blue-600'
                   }`
                 }
@@ -384,8 +491,8 @@ const TemplateManager = () => {
               <Tab
                 className={({ selected }) =>
                   `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
-                  ${selected 
-                    ? 'bg-white text-blue-600 shadow' 
+                  ${selected
+                    ? 'bg-white text-blue-600 shadow'
                     : 'text-gray-500 hover:bg-white/[0.12] hover:text-blue-600'
                   }`
                 }
@@ -393,7 +500,7 @@ const TemplateManager = () => {
                 Entegrasyon Şablonları
               </Tab>
             </Tab.List>
-            
+
             <Tab.Panels className="mt-4">
               {/* Menü Şablonları Panel */}
               <Tab.Panel>
@@ -401,7 +508,7 @@ const TemplateManager = () => {
                   <button
                     onClick={() => handleAddEditTemplate(null, templateTypes.MENU)}
                     className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.accent,
                       fontWeight: 600
                     }}
@@ -410,37 +517,37 @@ const TemplateManager = () => {
                     <span>Yeni Menü Şablonu</span>
                   </button>
                 </div>
-                
+
                 {loading ? (
                   <div className="flex items-center justify-center h-64">
-                    <div 
-                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" 
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
                       style={{ borderColor: theme.primary }}
                     ></div>
                   </div>
                 ) : getFilteredTemplates(templateTypes.MENU).length === 0 ? (
-                  <div 
+                  <div
                     className="rounded-lg p-8 text-center"
                     style={{ backgroundColor: theme.light }}
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-16 w-16 mx-auto mb-4" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                       style={{ color: theme.textSecondary }}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <h3 
-                      className="text-lg font-medium mb-2" 
+                    <h3
+                      className="text-lg font-medium mb-2"
                       style={{ color: theme.primary }}
                     >
                       Menü Şablonu Bulunamadı
                     </h3>
-                    <p 
-                      className="mb-4" 
+                    <p
+                      className="mb-4"
                       style={{ color: theme.textSecondary }}
                     >
                       {searchTerm ? "Arama kriterlerinize uygun şablon bulunmamaktadır." : "Henüz hiç menü şablonu eklenmemiş."}
@@ -449,16 +556,16 @@ const TemplateManager = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getFilteredTemplates(templateTypes.MENU).map(template => (
-                      <div 
-                        key={template.id} 
+                      <div
+                        key={template.id}
                         className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                         style={{ borderColor: "rgba(2, 43, 69, 0.1)" }}
                       >
-                        <div 
+                        <div
                           className="text-white px-4 py-3 flex justify-between items-center"
                           style={{ backgroundColor: theme.primary }}
                         >
-                          <h3 
+                          <h3
                             className="font-semibold text-lg truncate"
                           >
                             {template.name}
@@ -482,14 +589,14 @@ const TemplateManager = () => {
                             </button>
                           </div>
                         </div>
-                        
+
                         <div className="p-4">
                           {template.description && (
                             <div className="mb-3">
                               <p className="text-sm text-gray-600">{template.description}</p>
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Tip</span>
                             <span className="py-1 px-2 text-xs rounded-full bg-purple-100 text-purple-800">
@@ -500,7 +607,7 @@ const TemplateManager = () => {
                               {template.type === 'other' && 'Diğer'}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Durum</span>
                             <span className={`py-1 px-2 text-xs rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -513,14 +620,14 @@ const TemplateManager = () => {
                   </div>
                 )}
               </Tab.Panel>
-              
+
               {/* Fiyat Şablonları Panel */}
               <Tab.Panel>
                 <div className="flex justify-end mb-4">
                   <button
                     onClick={() => handleAddEditTemplate(null, templateTypes.PRICE)}
                     className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.accent,
                       fontWeight: 600
                     }}
@@ -529,37 +636,37 @@ const TemplateManager = () => {
                     <span>Yeni Fiyat Şablonu</span>
                   </button>
                 </div>
-                
+
                 {loading ? (
                   <div className="flex items-center justify-center h-64">
-                    <div 
-                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" 
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
                       style={{ borderColor: theme.primary }}
                     ></div>
                   </div>
                 ) : getFilteredTemplates(templateTypes.PRICE).length === 0 ? (
-                  <div 
+                  <div
                     className="rounded-lg p-8 text-center"
                     style={{ backgroundColor: theme.light }}
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-16 w-16 mx-auto mb-4" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                       style={{ color: theme.textSecondary }}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <h3 
-                      className="text-lg font-medium mb-2" 
+                    <h3
+                      className="text-lg font-medium mb-2"
                       style={{ color: theme.primary }}
                     >
                       Fiyat Şablonu Bulunamadı
                     </h3>
-                    <p 
-                      className="mb-4" 
+                    <p
+                      className="mb-4"
                       style={{ color: theme.textSecondary }}
                     >
                       {searchTerm ? "Arama kriterlerinize uygun şablon bulunmamaktadır." : "Henüz hiç fiyat şablonu eklenmemiş."}
@@ -568,16 +675,16 @@ const TemplateManager = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getFilteredTemplates(templateTypes.PRICE).map(template => (
-                      <div 
-                        key={template.id} 
+                      <div
+                        key={template.id}
                         className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                         style={{ borderColor: "rgba(2, 43, 69, 0.1)" }}
                       >
-                        <div 
+                        <div
                           className="text-white px-4 py-3 flex justify-between items-center"
                           style={{ backgroundColor: theme.accent }}
                         >
-                          <h3 
+                          <h3
                             className="font-semibold text-lg truncate"
                           >
                             {template.name}
@@ -601,21 +708,21 @@ const TemplateManager = () => {
                             </button>
                           </div>
                         </div>
-                        
+
                         <div className="p-4">
                           {template.description && (
                             <div className="mb-3">
                               <p className="text-sm text-gray-600">{template.description}</p>
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Yıl</span>
                             <span className="py-1 px-2 text-xs rounded-full bg-blue-100 text-blue-800">
                               {template.year || new Date().getFullYear()}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Durum</span>
                             <span className={`py-1 px-2 text-xs rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -628,14 +735,14 @@ const TemplateManager = () => {
                   </div>
                 )}
               </Tab.Panel>
-              
+
               {/* Entegrasyon Şablonları Panel */}
               <Tab.Panel>
                 <div className="flex justify-end mb-4">
                   <button
                     onClick={() => handleAddEditTemplate(null, templateTypes.INTEGRATION)}
                     className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.accent,
                       fontWeight: 600
                     }}
@@ -644,55 +751,55 @@ const TemplateManager = () => {
                     <span>Yeni Entegrasyon</span>
                   </button>
                 </div>
-                
+
                 {loading ? (
                   <div className="flex items-center justify-center h-64">
-                    <div 
-                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" 
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
                       style={{ borderColor: theme.primary }}
                     ></div>
                   </div>
                 ) : getFilteredTemplates(templateTypes.INTEGRATION).length === 0 ? (
-                  <div 
+                  <div
                     className="rounded-lg p-8 text-center"
                     style={{ backgroundColor: theme.light }}
                   >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-16 w-16 mx-auto mb-4" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                       style={{ color: theme.textSecondary }}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
                     </svg>
-                    <h3 
-                      className="text-lg font-medium mb-2" 
+                    <h3
+                      className="text-lg font-medium mb-2"
                       style={{ color: theme.primary }}
                     >
                       Entegrasyon Şablonu Bulunamadı
                     </h3>
-                    <p 
-                      className="mb-4" 
+                    <p
+                      className="mb-4"
                       style={{ color: theme.textSecondary }}
                     >
                       {searchTerm ? "Arama kriterlerinize uygun entegrasyon bulunmamaktadır." : "Henüz hiç entegrasyon şablonu eklenmemiş."}
                     </p>
                   </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getFilteredTemplates(templateTypes.INTEGRATION).map(template => (
-                      <div 
-                        key={template.id} 
+                      <div
+                        key={template.id}
                         className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                         style={{ borderColor: "rgba(2, 43, 69, 0.1)" }}
                       >
-                        <div 
+                        <div
                           className="text-white px-4 py-3 flex justify-between items-center"
                           style={{ backgroundColor: "#6B7280" }}
                         >
-                          <h3 
+                          <h3
                             className="font-semibold text-lg truncate"
                           >
                             {template.name}
@@ -716,14 +823,14 @@ const TemplateManager = () => {
                             </button>
                           </div>
                         </div>
-                        
+
                         <div className="p-4">
                           {template.description && (
                             <div className="mb-3">
                               <p className="text-sm text-gray-600">{template.description}</p>
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Tip</span>
                             <span className="py-1 px-2 text-xs rounded-full bg-purple-100 text-purple-800">
@@ -734,7 +841,7 @@ const TemplateManager = () => {
                               {template.type === 'other' && 'Diğer'}
                             </span>
                           </div>
-                          
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Durum</span>
                             <span className={`py-1 px-2 text-xs rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -750,26 +857,26 @@ const TemplateManager = () => {
             </Tab.Panels>
           </Tab.Group>
         </div>
-        
+
         {/* Şablon Ekleme/Düzenleme Modalı - Menü ve Fiyat */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div 
+            <div
               className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
               style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
             >
-              <div 
+              <div
                 className="flex justify-between items-center p-4"
                 style={{ borderBottom: `1px solid ${theme.secondary}` }}
               >
-                <h3 
+                <h3
                   className="text-xl font-semibold"
                   style={{ color: theme.primary }}
                 >
-                  {editingTemplate 
-                    ? `${editingTemplate.name} Şablonunu Düzenle` 
-                    : currentType === templateTypes.MENU 
-                      ? "Yeni Menü Şablonu Ekle" 
+                  {editingTemplate
+                    ? `${editingTemplate.name} Şablonunu Düzenle`
+                    : currentType === templateTypes.MENU
+                      ? "Yeni Menü Şablonu Ekle"
                       : "Yeni Fiyat Şablonu Ekle"
                   }
                 </h3>
@@ -780,11 +887,11 @@ const TemplateManager = () => {
                   ✕
                 </button>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-4">
                   <div>
-                    <label 
+                    <label
                       className="block text-sm font-medium mb-1"
                       style={{ color: theme.primary }}
                     >
@@ -800,10 +907,10 @@ const TemplateManager = () => {
                       required
                     />
                   </div>
-                  
+
                   {currentType === templateTypes.PRICE && (
                     <div>
-                      <label 
+                      <label
                         className="block text-sm font-medium mb-1"
                         style={{ color: theme.primary }}
                       >
@@ -822,9 +929,9 @@ const TemplateManager = () => {
                       />
                     </div>
                   )}
-                  
+
                   <div>
-                    <label 
+                    <label
                       className="block text-sm font-medium mb-1"
                       style={{ color: theme.primary }}
                     >
@@ -839,7 +946,7 @@ const TemplateManager = () => {
                       style={{ borderColor: theme.secondary }}
                     ></textarea>
                   </div>
-                  
+
                   <div>
                     <div className="flex items-center">
                       <input
@@ -849,13 +956,13 @@ const TemplateManager = () => {
                         checked={currentType === templateTypes.MENU ? menuForm.is_active : priceForm.is_active}
                         onChange={currentType === templateTypes.MENU ? handleMenuFormChange : handlePriceFormChange}
                         className="h-4 w-4 rounded focus:ring-0 border-2"
-                        style={{ 
+                        style={{
                           borderColor: theme.secondary,
                           accentColor: theme.accent
                         }}
                       />
-                      <label 
-                        htmlFor="is_active" 
+                      <label
+                        htmlFor="is_active"
                         className="ml-2 text-sm font-medium"
                         style={{ color: theme.primary }}
                       >
@@ -864,13 +971,13 @@ const TemplateManager = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-8 flex justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
                     className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                    style={{ 
+                    style={{
                       borderColor: theme.secondary,
                       color: theme.primary,
                       fontWeight: 600
@@ -881,7 +988,7 @@ const TemplateManager = () => {
                   <button
                     type="submit"
                     className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.accent,
                       fontWeight: 600,
                       boxShadow: "0 2px 4px rgba(217, 138, 61, 0.3)"
@@ -894,24 +1001,24 @@ const TemplateManager = () => {
             </div>
           </div>
         )}
-        
+
         {/* Entegrasyon Şablonu Modalı */}
         {showIntegrationModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div 
+            <div
               className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
             >
-              <div 
+              <div
                 className="flex justify-between items-center p-4"
                 style={{ borderBottom: `1px solid ${theme.secondary}` }}
               >
-                <h3 
+                <h3
                   className="text-xl font-semibold"
                   style={{ color: theme.primary }}
                 >
-                  {editingTemplate 
-                    ? `${editingTemplate.name} Entegrasyonunu Düzenle` 
+                  {editingTemplate
+                    ? `${editingTemplate.name} Entegrasyonunu Düzenle`
                     : "Yeni Entegrasyon Şablonu Ekle"
                   }
                 </h3>
@@ -922,11 +1029,11 @@ const TemplateManager = () => {
                   ✕
                 </button>
               </div>
-              
+
               <form onSubmit={handleIntegrationSubmit} className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
-                    <label 
+                    <label
                       className="block text-sm font-medium mb-1"
                       style={{ color: theme.primary }}
                     >
@@ -942,9 +1049,9 @@ const TemplateManager = () => {
                       required
                     />
                   </div>
-                  
+
                   <div>
-                    <label 
+                    <label
                       className="block text-sm font-medium mb-1"
                       style={{ color: theme.primary }}
                     >
@@ -965,7 +1072,7 @@ const TemplateManager = () => {
                       <option value="other">Diğer</option>
                     </select>
                   </div>
-                  
+
                   <div>
                     <div className="flex items-center">
                       <input
@@ -975,13 +1082,13 @@ const TemplateManager = () => {
                         checked={integrationForm.is_active}
                         onChange={handleIntegrationFormChange}
                         className="h-4 w-4 rounded focus:ring-0 border-2"
-                        style={{ 
+                        style={{
                           borderColor: theme.secondary,
                           accentColor: theme.accent
                         }}
                       />
-                      <label 
-                        htmlFor="integration_is_active" 
+                      <label
+                        htmlFor="integration_is_active"
                         className="ml-2 text-sm font-medium"
                         style={{ color: theme.primary }}
                       >
@@ -989,9 +1096,9 @@ const TemplateManager = () => {
                       </label>
                     </div>
                   </div>
-                  
+
                   <div className="md:col-span-2">
-                    <label 
+                    <label
                       className="block text-sm font-medium mb-1"
                       style={{ color: theme.primary }}
                     >
@@ -1006,14 +1113,14 @@ const TemplateManager = () => {
                       style={{ borderColor: theme.secondary }}
                     ></textarea>
                   </div>
-                  
+
                   {/* Entegrasyon Konfigürasyonu */}
                   <div className="md:col-span-2 border-t pt-4 mt-2">
                     <h4 className="font-medium mb-3 text-gray-700">Entegrasyon Konfigürasyonu</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label 
+                        <label
                           className="block text-sm font-medium mb-1"
                           style={{ color: theme.primary }}
                         >
@@ -1028,9 +1135,9 @@ const TemplateManager = () => {
                           style={{ borderColor: theme.secondary }}
                         />
                       </div>
-                      
+
                       <div>
-                        <label 
+                        <label
                           className="block text-sm font-medium mb-1"
                           style={{ color: theme.primary }}
                         >
@@ -1046,7 +1153,7 @@ const TemplateManager = () => {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 mb-2">
                         Not: Entegrasyon detayları şubelere özel olarak her şubede ayrıca ayarlanabilir.
@@ -1054,13 +1161,13 @@ const TemplateManager = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-8 flex justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setShowIntegrationModal(false)}
                     className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                    style={{ 
+                    style={{
                       borderColor: theme.secondary,
                       color: theme.primary,
                       fontWeight: 600
@@ -1071,7 +1178,7 @@ const TemplateManager = () => {
                   <button
                     type="submit"
                     className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.accent,
                       fontWeight: 600,
                       boxShadow: "0 2px 4px rgba(217, 138, 61, 0.3)"
@@ -1084,49 +1191,49 @@ const TemplateManager = () => {
             </div>
           </div>
         )}
-        
+
         {/* Silme Onay Modalı */}
         {confirmDelete && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div 
+            <div
               className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
               style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
             >
               <div className="text-center">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="h-12 w-12 mx-auto mb-4" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-12 w-12 mx-auto mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
                   stroke="currentColor"
                   style={{ color: theme.danger }}
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
                 </svg>
-                
-                <h3 
+
+                <h3
                   className="text-xl font-semibold mb-2"
                   style={{ color: theme.primary }}
                 >
                   Şablonu Sil
                 </h3>
-                <p 
+                <p
                   className="mb-6"
                   style={{ color: theme.textSecondary }}
                 >
                   Bu şablonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve şablonu kullanan şubeler etkilenebilir.
                 </p>
-                
+
                 <div className="flex justify-center gap-3">
                   <button
                     onClick={() => setConfirmDelete(null)}
                     className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                    style={{ 
+                    style={{
                       borderColor: theme.secondary,
                       color: theme.primary,
                       fontWeight: 600
@@ -1137,7 +1244,7 @@ const TemplateManager = () => {
                   <button
                     onClick={() => handleDelete(confirmDelete.id, confirmDelete.type)}
                     className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors"
-                    style={{ 
+                    style={{
                       backgroundColor: theme.danger,
                       fontWeight: 600
                     }}
