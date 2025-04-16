@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
-import { FiEdit2, FiTrash2, FiPlus, FiInfo, FiSettings, FiCheck, FiX } from "react-icons/fi";
+import { useState, useEffect, useRef } from "react";
+import { FiEdit2, FiTrash2, FiPlus, FiInfo, FiSettings, FiCheck, FiX, FiUpload, FiDownload, FiEye, FiEyeOff, FiPackage } from "react-icons/fi";
 import { HiOutlineDocumentSearch } from "react-icons/hi";
 import api from "../lib/axios";
 import toast from "react-hot-toast";
 import { Tab } from '@headlessui/react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 // Çeşme Kahvecisi tema renkleri
 const theme = {
@@ -41,6 +43,22 @@ const TemplateManager = () => {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Ürün Yönetimi
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [showPriceProductsModal, setShowPriceProductsModal] = useState(false);
+  const [currentTemplateId, setCurrentTemplateId] = useState(null);
+  const [templateProducts, setTemplateProducts] = useState([]);
+  const [templatePriceProducts, setTemplatePriceProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [productFilter, setProductFilter] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("");
+  const [productLoading, setProductLoading] = useState(false);
+
+  // Excel import için dosya referansı
+  const fileInputRef = useRef(null);
+  const priceFileInputRef = useRef(null);
 
   const [currentType, setCurrentType] = useState(templateTypes.MENU);
 
@@ -93,8 +111,31 @@ const TemplateManager = () => {
     }
   };
 
+  // Tüm ürünleri getir
+  const fetchAllProducts = async () => {
+    try {
+      const response = await api.get("/api/products");
+      setAllProducts(response.data);
+    } catch (error) {
+      console.error("Tüm ürünler yüklenirken hata:", error);
+      toast.error("Ürünler yüklenemedi!");
+    }
+  };
+
+  // Kategorileri getir
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get("/api/categories");
+      setCategories(response.data);
+    } catch (error) {
+      console.error("Kategoriler yüklenirken hata:", error);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates();
+    fetchAllProducts();
+    fetchCategories();
   }, []);
 
   // Form değişikliklerini izle
@@ -328,7 +369,7 @@ const TemplateManager = () => {
 
   // Menü şablonundaki ürünleri yönetme fonksiyonu
   const handleManageMenuProducts = async (templateId) => {
-    setLoading(true);
+    setProductLoading(true);
     try {
       // Şablondaki ürünleri getir
       const response = await api.get(`/api/templates/menu/${templateId}/products`);
@@ -337,18 +378,18 @@ const TemplateManager = () => {
       // Ürün yönetim modalını aç
       setTemplateProducts(products);
       setCurrentTemplateId(templateId);
-      setShowProductManagementModal(true);
+      setShowProductsModal(true);
     } catch (error) {
       console.error("Şablon ürünleri yüklenirken hata:", error);
       toast.error("Şablon ürünleri yüklenemedi!");
     } finally {
-      setLoading(false);
+      setProductLoading(false);
     }
   };
 
   // Fiyat şablonundaki ürünleri yönetme fonksiyonu
   const handleManagePriceProducts = async (templateId) => {
-    setLoading(true);
+    setProductLoading(true);
     try {
       // Şablondaki ürün fiyatlarını getir
       const response = await api.get(`/api/templates/price/${templateId}/products`);
@@ -357,81 +398,218 @@ const TemplateManager = () => {
       // Fiyat yönetim modalını aç
       setTemplatePriceProducts(products);
       setCurrentTemplateId(templateId);
-      setShowPriceManagementModal(true);
+      setShowPriceProductsModal(true);
     } catch (error) {
       console.error("Şablon ürün fiyatları yüklenirken hata:", error);
       toast.error("Şablon ürün fiyatları yüklenemedi!");
     } finally {
-      setLoading(false);
+      setProductLoading(false);
+    }
+  };
+
+  // Ürün görünürlüğünü güncelle - Menü şablonu için
+  const handleProductVisibilityToggle = async (productId, isVisible) => {
+    try {
+      // API için istek hazırla
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: [{ product_id: productId, is_visible: !isVisible }]
+      });
+
+      // Yerel state'i güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId
+            ? { ...product, is_visible: !isVisible }
+            : product
+        )
+      );
+
+      toast.success("Ürün görünürlüğü güncellendi");
+    } catch (error) {
+      console.error("Görünürlük güncellenirken hata:", error);
+      toast.error("Görünürlük güncellenemedi!");
+    }
+  };
+
+  // Fiyat güncelleme - Fiyat şablonu için
+  const handlePriceUpdate = async (productId, newPrice) => {
+    try {
+      await api.post(`/api/templates/price/${currentTemplateId}/products`, {
+        products: [{ product_id: productId, price: parseFloat(newPrice) }]
+      });
+
+      // Yerel state'i güncelle
+      setTemplatePriceProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId
+            ? { ...product, template_price: parseFloat(newPrice) }
+            : product
+        )
+      );
+
+      toast.success("Ürün fiyatı güncellendi");
+    } catch (error) {
+      console.error("Fiyat güncellenirken hata:", error);
+      toast.error("Fiyat güncellenemedi!");
     }
   };
 
   // Excel import fonksiyonu - Menü şablonu için
-  const handleMenuTemplateExcelImport = async (excelData, templateId) => {
+  const handleMenuTemplateExcelImport = async (e) => {
+    if (!currentTemplateId) {
+      toast.error("Lütfen önce bir menü şablonu seçin");
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setProductLoading(true);
+
     try {
+      // Excel dosyasını oku
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
       // Excel verilerini API'ye gönder
-      await api.post(`/api/templates/menu/${templateId}/products/batch`, excelData);
+      await api.post(`/api/templates/menu/${currentTemplateId}/products/batch`, jsonData);
       toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
 
       // Güncel ürünleri yeniden yükle
-      handleManageMenuProducts(templateId);
+      handleManageMenuProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
       toast.error("Menü şablonu ürünleri içe aktarılamadı");
+    } finally {
+      setProductLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   // Excel export fonksiyonu - Menü şablonu için
-  const handleMenuTemplateExcelExport = (templateId) => {
-    api.get(`/api/templates/menu/${templateId}/products`).then(response => {
-      const products = response.data;
+  const handleMenuTemplateExcelExport = () => {
+    if (!currentTemplateId || templateProducts.length === 0) {
+      toast.error("Dışa aktarılacak ürün bulunamadı");
+      return;
+    }
 
-      // Excel için data hazırla
-      const excelData = products.map(product => ({
-        "Ürün Adı": product.name,
-        "Kategori": product.category_name,
-        "Görünür": product.is_visible ? "Evet" : "Hayır",
-        "Açıklama": product.description || "",
-        "Ürün ID": product.id
-      }));
+    // Excel için data hazırla
+    const excelData = templateProducts.map(product => ({
+      "Ürün Adı": product.name,
+      "Kategori": product.category_name,
+      "Görünür": product.is_visible ? "Evet" : "Hayır",
+      "Açıklama": product.description || "",
+      "Ürün ID": product.id
+    }));
 
-      // Excel'e aktar
-      exportToExcel(excelData, `menu_template_${templateId}`);
-    });
+    // Excel dosyasını oluştur
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürünler");
+
+    // Dosyayı indir
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+    // Şablon adını al
+    const template = templates[templateTypes.MENU].find(t => t.id === currentTemplateId);
+    const templateName = template ? template.name.replace(/\s+/g, '_') : 'menu_template';
+
+    saveAs(data, `${templateName}.xlsx`);
+
+    toast.success("Excel dosyası indiriliyor...");
   };
 
   // Excel import fonksiyonu - Fiyat şablonu için
-  const handlePriceTemplateExcelImport = async (excelData, templateId) => {
+  const handlePriceTemplateExcelImport = async (e) => {
+    if (!currentTemplateId) {
+      toast.error("Lütfen önce bir fiyat şablonu seçin");
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setProductLoading(true);
+
     try {
+      // Excel dosyasını oku
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
       // Excel verilerini API'ye gönder
-      await api.post(`/api/templates/price/${templateId}/products/batch`, excelData);
+      await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, jsonData);
       toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
 
       // Güncel ürünleri yeniden yükle
-      handleManagePriceProducts(templateId);
+      handleManagePriceProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
       toast.error("Fiyat şablonu ürünleri içe aktarılamadı");
+    } finally {
+      setProductLoading(false);
+      if (priceFileInputRef.current) {
+        priceFileInputRef.current.value = '';
+      }
     }
   };
 
   // Excel export fonksiyonu - Fiyat şablonu için
-  const handlePriceTemplateExcelExport = (templateId) => {
-    api.get(`/api/templates/price/${templateId}/products`).then(response => {
-      const products = response.data;
+  const handlePriceTemplateExcelExport = () => {
+    if (!currentTemplateId || templatePriceProducts.length === 0) {
+      toast.error("Dışa aktarılacak ürün bulunamadı");
+      return;
+    }
 
-      // Excel için data hazırla
-      const excelData = products.map(product => ({
-        "Ürün Adı": product.name,
-        "Kategori": product.category_name,
-        "Fiyat (TL)": product.template_price || product.price || 0,
-        "Ürün ID": product.id
-      }));
+    // Excel için data hazırla
+    const excelData = templatePriceProducts.map(product => ({
+      "Ürün Adı": product.name,
+      "Kategori": product.category_name,
+      "Fiyat (TL)": product.template_price || product.price || 0,
+      "Ürün ID": product.id
+    }));
 
-      // Excel'e aktar
-      exportToExcel(excelData, `price_template_${templateId}`);
-    });
+    // Excel dosyasını oluştur
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürün Fiyatları");
+
+    // Dosyayı indir
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+    // Şablon adını al
+    const template = templates[templateTypes.PRICE].find(t => t.id === currentTemplateId);
+    const templateName = template ? template.name.replace(/\s+/g, '_') : 'price_template';
+
+    saveAs(data, `${templateName}.xlsx`);
+
+    toast.success("Excel dosyası indiriliyor...");
   };
+
+  // Ürünleri filtrele - Menü şablonu için
+  const filteredTemplateProducts = templateProducts.filter(product => {
+    return (
+      (product.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+        product.category_name?.toLowerCase().includes(productFilter.toLowerCase())) &&
+      (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
+    );
+  });
+
+  // Ürünleri filtrele - Fiyat şablonu için
+  const filteredTemplatePriceProducts = templatePriceProducts.filter(product => {
+    return (
+      (product.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+        product.category_name?.toLowerCase().includes(productFilter.toLowerCase())) &&
+      (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
+    );
+  });
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -598,22 +776,20 @@ const TemplateManager = () => {
                           )}
 
                           <div className="flex items-center justify-between mt-2">
-                            <span className="text-sm text-gray-500">Tip</span>
-                            <span className="py-1 px-2 text-xs rounded-full bg-purple-100 text-purple-800">
-                              {template.type === 'delivery' && 'Teslimat'}
-                              {template.type === 'payment' && 'Ödeme'}
-                              {template.type === 'order' && 'Sipariş'}
-                              {template.type === 'menu' && 'Menü'}
-                              {template.type === 'other' && 'Diğer'}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Durum</span>
                             <span className={`py-1 px-2 text-xs rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                               {template.is_active ? 'Aktif' : 'Pasif'}
                             </span>
                           </div>
+
+                          {/* Ürün yönetimi butonu */}
+                          <button
+                            onClick={() => handleManageMenuProducts(template.id)}
+                            className="w-full mt-4 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <FiPackage size={16} />
+                            <span>Ürünleri Yönet</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -729,6 +905,15 @@ const TemplateManager = () => {
                               {template.is_active ? 'Aktif' : 'Pasif'}
                             </span>
                           </div>
+
+                          {/* Fiyat yönetimi butonu */}
+                          <button
+                            onClick={() => handleManagePriceProducts(template.id)}
+                            className="w-full mt-4 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <FiSettings size={16} />
+                            <span>Fiyatları Yönet</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -1188,6 +1373,419 @@ const TemplateManager = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Menü Şablonu Ürün Yönetimi Modalı */}
+        {showProductsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+            >
+              <div
+                className="flex justify-between items-center p-4"
+                style={{ borderBottom: `1px solid ${theme.secondary}` }}
+              >
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: theme.primary }}
+                >
+                  Menü Şablonu Ürünleri
+                </h3>
+                <button
+                  onClick={() => setShowProductsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6">
+                {/* Excel Import/Export Butonları */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleMenuTemplateExcelImport}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current.click()}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={productLoading}
+                  >
+                    <FiUpload size={16} />
+                    <span>Excel'den İçe Aktar</span>
+                  </button>
+
+                  <button
+                    onClick={handleMenuTemplateExcelExport}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={productLoading || templateProducts.length === 0}
+                  >
+                    <FiDownload size={16} />
+                    <span>Excel'e Dışa Aktar</span>
+                  </button>
+                </div>
+
+                {/* Filtre ve Arama */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      placeholder="Ürün ara..."
+                      value={productFilter}
+                      onChange={e => setProductFilter(e.target.value)}
+                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
+                    />
+                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
+                  </div>
+
+                  <select
+                    value={productCategoryFilter}
+                    onChange={e => setProductCategoryFilter(e.target.value)}
+                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
+                  >
+                    <option value="">Tüm Kategoriler</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ürün Listesi */}
+                {productLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : filteredTemplateProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M9 12h6m-6 4h6m-6-8h6M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
+                    <p className="text-gray-500 mb-4">Şablonda ürün bulunmuyor veya filtrelere uygun ürün yok.</p>
+                    <p className="text-sm text-gray-400">Excel ile ürün ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 border-b">Görünür</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTemplateProducts.map(product => (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "/uploads/guncellenecek.jpg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                      No Image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                      {product.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              {product.category_name ? (
+                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  {product.category_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b text-center">
+                              <button
+                                onClick={() => handleProductVisibilityToggle(product.id, product.is_visible)}
+                                className={`p-1.5 rounded-full transition-colors ${product.is_visible
+                                    ? "bg-green-100 text-green-600 hover:bg-green-200"
+                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  }`}
+                                title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
+                              >
+                                {product.is_visible ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 border-b text-right font-medium">
+                              {product.price} ₺
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Bilgi Notu */}
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <h4 className="text-sm font-medium text-blue-700 mb-1 flex items-center gap-1">
+                    <FiInfo size={16} />
+                    <span>Menü Şablonu Hakkında</span>
+                  </h4>
+                  <p className="text-sm text-blue-600">
+                    Bu menü şablonunu kullanan şubeler yalnızca "Görünür" olarak işaretlenen ürünleri müşterilerine gösterecektir.
+                    Excel ile toplu içe/dışa aktarma yapabilir veya her ürünün görünürlüğünü tek tek değiştirebilirsiniz.
+                  </p>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowProductsModal(false)}
+                    className="px-4 py-2 text-white rounded-lg"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fiyat Şablonu Ürün Fiyatları Modalı */}
+        {showPriceProductsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+            >
+              <div
+                className="flex justify-between items-center p-4"
+                style={{ borderBottom: `1px solid ${theme.secondary}` }}
+              >
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: theme.primary }}
+                >
+                  Fiyat Şablonu Yönetimi
+                </h3>
+                <button
+                  onClick={() => setShowPriceProductsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6">
+                {/* Excel Import/Export Butonları */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <input
+                    type="file"
+                    ref={priceFileInputRef}
+                    onChange={handlePriceTemplateExcelImport}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    onClick={() => priceFileInputRef.current.click()}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={productLoading}
+                  >
+                    <FiUpload size={16} />
+                    <span>Excel'den Fiyat İçe Aktar</span>
+                  </button>
+
+                  <button
+                    onClick={handlePriceTemplateExcelExport}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={productLoading || templatePriceProducts.length === 0}
+                  >
+                    <FiDownload size={16} />
+                    <span>Fiyatları Excel'e Aktar</span>
+                  </button>
+                </div>
+
+                {/* Filtre ve Arama */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      placeholder="Ürün ara..."
+                      value={productFilter}
+                      onChange={e => setProductFilter(e.target.value)}
+                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
+                    />
+                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
+                  </div>
+
+                  <select
+                    value={productCategoryFilter}
+                    onChange={e => setProductCategoryFilter(e.target.value)}
+                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
+                  >
+                    <option value="">Tüm Kategoriler</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ürün Fiyat Listesi */}
+                {productLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : filteredTemplatePriceProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
+                    <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
+                    <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTemplatePriceProducts.map(product => (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "/uploads/guncellenecek.jpg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                      No Image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                      {product.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              {product.category_name ? (
+                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  {product.category_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
+                              {product.price} ₺
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center justify-end">
+                                <input
+                                  type="number"
+                                  className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  value={product.template_price || product.price}
+                                  min="0"
+                                  step="0.01"
+                                  onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
+                                  onBlur={(e) => {
+                                    // Boş değer veya 0 ise gerçek fiyatı kullan
+                                    if (!e.target.value || parseFloat(e.target.value) <= 0) {
+                                      handlePriceUpdate(product.id, product.price);
+                                    }
+                                  }}
+                                />
+                                <span className="ml-2 text-gray-700">₺</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Bilgi Notu */}
+                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                  <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
+                    <FiInfo size={16} />
+                    <span>Fiyat Şablonu Hakkında</span>
+                  </h4>
+                  <p className="text-sm text-amber-600">
+                    Bu fiyat şablonunu kullanan şubeler için özel fiyatlar tanımlayabilirsiniz. Excel ile toplu fiyat güncellemesi
+                    yapabilir veya ürünlerin fiyatlarını tek tek değiştirebilirsiniz. Değişiklikler anlık olarak kaydedilir.
+                  </p>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowPriceProductsModal(false)}
+                    className="px-4 py-2 text-white rounded-lg"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
