@@ -39,26 +39,24 @@ const EnhancedBrandManager = () => {
     const [editingBrand, setEditingBrand] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(null);
-    const [viewMode, setViewMode] = useState("grid"); // "grid" veya "list" görünüm modu
+    const [viewMode, setViewMode] = useState(localStorage.getItem('brandManagerView') || "grid"); // localStorage'dan al, yoksa "grid"
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [detailsBrand, setDetailsBrand] = useState(null);
     const [branchesCount, setBranchesCount] = useState({});
 
-    // Form state
+    // Form state - Veritabanı kolonlarıyla uyumlu
     const [form, setForm] = useState({
         name: "",
         logo_url: "",
         contact_email: "",
         contact_phone: "",
         address: "",
-        website: "",
+        website_url: "",
         description: "",
-        is_active: true,
         default_menu_template_id: "",
         default_price_template_id: ""
     });
 
-    // Verileri getir
     // Verileri getir
     const fetchData = async () => {
         setLoading(true);
@@ -67,22 +65,36 @@ const EnhancedBrandManager = () => {
             const brandsResponse = await api.get("/api/brands");
             console.log("Brands response:", brandsResponse.data);
 
-            const brandList = Array.isArray(brandsResponse.data)
-                ? brandsResponse.data
-                : brandsResponse.data.brands || brandsResponse.data.data || [];
+            // API yanıtı farklı formatlarda olabilir - düzgün şekilde işle
+            let brandList = [];
+            if (brandsResponse.data) {
+                if (Array.isArray(brandsResponse.data)) {
+                    brandList = brandsResponse.data;
+                } else if (brandsResponse.data.data && Array.isArray(brandsResponse.data.data)) {
+                    brandList = brandsResponse.data.data;
+                } else if (brandsResponse.data.brands && Array.isArray(brandsResponse.data.brands)) {
+                    brandList = brandsResponse.data.brands;
+                }
+            }
 
+            console.log("İşlenmiş marka listesi:", brandList);
             setBrands(brandList);
 
             // Menü ve fiyat şablonlarını aynı anda getir
-            const [menuRes, priceRes] = await Promise.all([
-                api.get("/api/templates/menu"),
-                api.get("/api/templates/price"),
-            ]);
+            try {
+                const [menuRes, priceRes] = await Promise.all([
+                    api.get("/api/templates/menu"),
+                    api.get("/api/templates/price"),
+                ]);
 
-            setTemplates({
-                menu: menuRes.data || [],
-                price: priceRes.data || [],
-            });
+                setTemplates({
+                    menu: Array.isArray(menuRes.data) ? menuRes.data : [],
+                    price: Array.isArray(priceRes.data) ? priceRes.data : [],
+                });
+            } catch (templatesError) {
+                console.error("Şablonlar yüklenirken hata:", templatesError);
+                // Şablonlar yüklenemese bile devam et
+            }
 
             // Her marka için şube sayısını getir
             const branchCounts = {};
@@ -90,9 +102,16 @@ const EnhancedBrandManager = () => {
             for (const brand of brandList) {
                 try {
                     const branchesRes = await api.get(`/api/brands/${brand.id}/branches`);
-                    const branches = Array.isArray(branchesRes.data)
-                        ? branchesRes.data
-                        : branchesRes.data.branches || branchesRes.data || [];
+                    let branches = [];
+                    
+                    if (branchesRes.data) {
+                        if (Array.isArray(branchesRes.data)) {
+                            branches = branchesRes.data;
+                        } else if (branchesRes.data.branches && Array.isArray(branchesRes.data.branches)) {
+                            branches = branchesRes.data.branches;
+                        }
+                    }
+                    
                     branchCounts[brand.id] = branches.length;
                 } catch (err) {
                     console.error(`${brand.id} ID'li marka için şube sayısı alınamadı:`, err);
@@ -112,23 +131,34 @@ const EnhancedBrandManager = () => {
         }
     };
 
-
-
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Görünüm modu değiştiğinde localStorage'a kaydet
+    const handleViewModeChange = (mode) => {
+        setViewMode(mode);
+        localStorage.setItem('brandManagerView', mode);
+    };
 
     // Form değişikliklerini izle
     const handleFormChange = (e) => {
         const { name, value, type, checked } = e.target;
         const inputValue = type === 'checkbox' ? checked : value;
-        setForm({ ...form, [name]: inputValue });
+        
+        // website alanının website_url'e dönüştürülmesi için özel işlem
+        if (name === 'website') {
+            setForm({ ...form, website_url: value });
+        } else {
+            setForm({ ...form, [name]: inputValue });
+        }
     };
 
     // Marka ekleme/düzenleme modalını aç
     const handleAddEditBrand = (brand = null) => {
         if (brand) {
             // Düzenleme modu
+            console.log("Düzenlenecek marka:", brand);
             setEditingBrand(brand);
             setForm({
                 name: brand.name || "",
@@ -136,9 +166,8 @@ const EnhancedBrandManager = () => {
                 contact_email: brand.contact_email || "",
                 contact_phone: brand.contact_phone || "",
                 address: brand.address || "",
-                website: brand.website || "",
+                website_url: brand.website_url || "",
                 description: brand.description || "",
-                is_active: brand.is_active !== false,
                 default_menu_template_id: brand.default_menu_template_id || "",
                 default_price_template_id: brand.default_price_template_id || ""
             });
@@ -151,9 +180,8 @@ const EnhancedBrandManager = () => {
                 contact_email: "",
                 contact_phone: "",
                 address: "",
-                website: "",
+                website_url: "",
                 description: "",
-                is_active: true,
                 default_menu_template_id: templates.menu[0]?.id || "",
                 default_price_template_id: templates.price[0]?.id || ""
             });
@@ -184,25 +212,61 @@ const EnhancedBrandManager = () => {
 
         try {
             let response;
+            const formData = { ...form };
+            
+            console.log("Gönderilecek form verisi:", formData);
 
             if (editingBrand) {
                 // Var olan markayı güncelle
-                response = await api.put(`/api/brands/${editingBrand.id}`, form);
+                response = await api.put(`/api/brands/${editingBrand.id}`, formData);
+                console.log("Güncelleme yanıtı:", response.data);
                 toast.success(`${form.name} markası başarıyla güncellendi`);
             } else {
                 // Yeni marka ekle
-                response = await api.post("/api/brands", form);
+                response = await api.post("/api/brands", formData);
+                console.log("Ekleme yanıtı:", response.data);
                 toast.success(`${form.name} markası başarıyla eklendi`);
             }
 
-            // Markaları yeniden yükle
-            fetchData();
+            // Markaları yeniden yükle - kısa gecikme ile
+            setTimeout(() => {
+                fetchData();
+            }, 300);
 
             // Modalı kapat
             setShowModal(false);
         } catch (error) {
             console.error("Form gönderilirken hata:", error);
-            toast.error("İşlem başarısız oldu!");
+            console.error("Hata detayları:", error.response?.data || error.message);
+            toast.error(error.response?.data?.error || "İşlem başarısız oldu!");
+        }
+    };
+
+    // Marka aktif/pasif durumunu güncelle
+    const handleToggleActive = async (brand) => {
+        try {
+            const newStatus = !brand.is_active;
+            
+            console.log(`Marka ${brand.id} durumu değiştiriliyor: ${newStatus ? 'aktif' : 'pasif'}`);
+            
+            // PATCH isteği gönder
+            const response = await api.patch(`/api/brands/${brand.id}/status`, {
+                is_active: newStatus
+            });
+            
+            console.log("Durum değiştirme yanıtı:", response.data);
+            
+            // Markaları güncelle
+            const updatedBrands = brands.map(b => 
+                b.id === brand.id ? { ...b, is_active: newStatus } : b
+            );
+            
+            setBrands(updatedBrands);
+            
+            toast.success(`${brand.name} markası ${newStatus ? 'aktif' : 'pasif'} duruma getirildi`);
+        } catch (error) {
+            console.error("Marka durumu değiştirilirken hata:", error);
+            toast.error("Durum değiştirilemedi!");
         }
     };
 
@@ -215,7 +279,13 @@ const EnhancedBrandManager = () => {
             setConfirmDelete(null);
         } catch (error) {
             console.error("Marka silinirken hata:", error);
-            toast.error("Marka silinemedi!");
+            
+            // Eğer marka silme hatası şube varlığı ile ilgiliyse
+            if (error.response?.data?.branch_count) {
+                toast.error(`Bu markaya ait ${error.response.data.branch_count} şube bulunduğu için silinemez.`);
+            } else {
+                toast.error(error.response?.data?.error || "Marka silinemedi!");
+            }
         }
     };
 
@@ -274,7 +344,7 @@ const EnhancedBrandManager = () => {
                         {/* Görünüm değiştirme butonları */}
                         <div className="flex border rounded-lg overflow-hidden">
                             <button
-                                onClick={() => setViewMode("grid")}
+                                onClick={() => handleViewModeChange("grid")}
                                 className={`px-3 py-1.5 ${viewMode === "grid" ? "bg-gray-100" : "bg-white"}`}
                                 title="Grid Görünüm"
                             >
@@ -283,7 +353,7 @@ const EnhancedBrandManager = () => {
                                 </svg>
                             </button>
                             <button
-                                onClick={() => setViewMode("list")}
+                                onClick={() => handleViewModeChange("list")}
                                 className={`px-3 py-1.5 ${viewMode === "list" ? "bg-gray-100" : "bg-white"}`}
                                 title="Liste Görünüm"
                             >
@@ -442,14 +512,14 @@ const EnhancedBrandManager = () => {
                                             </div>
                                         )}
 
-                                        {brand.website && (
+                                        {brand.website_url && (
                                             <div className="flex items-center gap-2">
                                                 <FiGlobe style={{ color: theme.accent }} size={16} />
                                                 <p
                                                     className="text-sm"
                                                     style={{ color: theme.textPrimary }}
                                                 >
-                                                    {brand.website}
+                                                    {brand.website_url}
                                                 </p>
                                             </div>
                                         )}
@@ -480,7 +550,7 @@ const EnhancedBrandManager = () => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 border-t" style={{ backgroundColor: theme.light }}>
+                                <div className="grid grid-cols-4 border-t" style={{ backgroundColor: theme.light }}>
                                     <button
                                         onClick={() => handleGoToBranches(brand.id)}
                                         className="flex flex-col items-center justify-center py-3 hover:bg-gray-200 transition-colors"
@@ -495,6 +565,24 @@ const EnhancedBrandManager = () => {
                                     >
                                         <FiInfo size={18} style={{ color: theme.accent }} />
                                         <span className="text-xs mt-1" style={{ color: theme.textSecondary }}>Detaylar</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleToggleActive(brand)}
+                                        className="flex flex-col items-center justify-center py-3 hover:bg-gray-200 transition-colors"
+                                        title={brand.is_active ? "Pasif Yap" : "Aktif Yap"}
+                                    >
+                                        {brand.is_active ? (
+                                            <>
+                                                <FiX size={18} style={{ color: theme.danger }} />
+                                                <span className="text-xs mt-1" style={{ color: theme.textSecondary }}>Pasif Yap</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FiCheck size={18} style={{ color: theme.success }} />
+                                                <span className="text-xs mt-1" style={{ color: theme.textSecondary }}>Aktif Yap</span>
+                                            </>
+                                        )}
                                     </button>
 
                                     <div className="flex flex-col items-center justify-center py-3">
@@ -549,7 +637,7 @@ const EnhancedBrandManager = () => {
                                                 </div>
                                                 <div className="ml-4">
                                                     <div className="text-sm font-medium text-gray-900">{brand.name}</div>
-                                                    <div className="text-sm text-gray-500">{brand.website || ''}</div>
+                                                    <div className="text-sm text-gray-500">{brand.website_url || ''}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -584,6 +672,13 @@ const EnhancedBrandManager = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex space-x-2">
+                                                <button
+                                                    onClick={() => handleToggleActive(brand)}
+                                                    className={`${brand.is_active ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900"}`}
+                                                    title={brand.is_active ? "Pasif Yap" : "Aktif Yap"}
+                                                >
+                                                    {brand.is_active ? <FiX size={18} /> : <FiCheck size={18} />}
+                                                </button>
                                                 <button
                                                     onClick={() => handleOpenDetails(brand)}
                                                     className="text-blue-600 hover:text-blue-900"
@@ -653,7 +748,7 @@ const EnhancedBrandManager = () => {
                                     <Tab
                                         className={({ selected }) =>
                                             `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
-                      ${selected
+                                            ${selected
                                                 ? 'bg-white text-blue-600 shadow'
                                                 : 'text-gray-500 hover:bg-white/[0.12] hover:text-blue-600'
                                             }`
@@ -664,7 +759,7 @@ const EnhancedBrandManager = () => {
                                     <Tab
                                         className={({ selected }) =>
                                             `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
-                      ${selected
+                                            ${selected
                                                 ? 'bg-white text-blue-600 shadow'
                                                 : 'text-gray-500 hover:bg-white/[0.12] hover:text-blue-600'
                                             }`
@@ -766,7 +861,7 @@ const EnhancedBrandManager = () => {
                                                 <input
                                                     type="text"
                                                     name="website"
-                                                    value={form.website}
+                                                    value={form.website_url}
                                                     onChange={handleFormChange}
                                                     className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     style={{
@@ -812,32 +907,6 @@ const EnhancedBrandManager = () => {
                                                         borderColor: theme.secondary
                                                     }}
                                                 ></textarea>
-                                            </div>
-
-                                            <div>
-                                                <div className="flex items-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="is_active"
-                                                        name="is_active"
-                                                        checked={form.is_active}
-                                                        onChange={handleFormChange}
-                                                        className="h-4 w-4 rounded focus:ring-0 border-2"
-                                                        style={{
-                                                            borderColor: theme.secondary,
-                                                            accentColor: theme.accent
-                                                        }}
-                                                    />
-                                                    <label
-                                                        htmlFor="is_active"
-                                                        className="ml-2 text-sm font-medium"
-                                                        style={{
-                                                            color: theme.primary
-                                                        }}
-                                                    >
-                                                        Marka aktif
-                                                    </label>
-                                                </div>
                                             </div>
                                         </div>
                                     </Tab.Panel>
@@ -1001,7 +1070,7 @@ const EnhancedBrandManager = () => {
                                             ? "bg-green-100 text-green-800"
                                             : "bg-gray-100 text-gray-800"
                                             }`}>
-                                            {detailsBrand.is_active ? "Aktif" : "Pasif"}
+                                            {detailsBrand.is_active ? 'Aktif' : 'Pasif'}
                                         </span>
                                         <span className="mx-2 text-gray-300">•</span>
                                         <span className="text-sm text-gray-500">
@@ -1028,10 +1097,10 @@ const EnhancedBrandManager = () => {
                                                 <span>{detailsBrand.contact_phone}</span>
                                             </li>
                                         )}
-                                        {detailsBrand.website && (
+                                        {detailsBrand.website_url && (
                                             <li className="flex items-center gap-2 text-sm">
                                                 <FiGlobe className="text-gray-400" />
-                                                <span>{detailsBrand.website}</span>
+                                                <span>{detailsBrand.website_url}</span>
                                             </li>
                                         )}
                                         {detailsBrand.address && (
@@ -1125,7 +1194,7 @@ const EnhancedBrandManager = () => {
                                 className="mb-6"
                                 style={{ color: theme.textSecondary }}
                             >
-                                Bu markayı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve markaya bağlı tüm şubeler de silinecektir.
+                                Bu markayı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve markaya bağlı tüm şubeler de etkilenebilir.
                             </p>
 
                             <div className="flex justify-center gap-3">

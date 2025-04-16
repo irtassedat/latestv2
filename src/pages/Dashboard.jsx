@@ -2,63 +2,71 @@ import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import api from "../lib/axios"
 import { useAuth } from "../contexts/AuthContext"
+import toast from "react-hot-toast"
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
-    totalProducts: 0,
-    totalBranches: 0,
-    totalOrders: 0,
-    totalCategories: 0,
-    totalBrands: 0
+    total_products: 0,
+    total_branches: 0,
+    total_orders: 0,
+    total_categories: 0,
+    total_brands: 0
   })
   const [recentOrders, setRecentOrders] = useState([])
-  const [brands, setBrands] = useState([])  // Markaları tutacak state
+  const [brands, setBrands] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchDashboardData = async () => {
+      setLoading(true)
       try {
-        // Gerçek bir API çağrısı yapılabilir veya mock data kullanılabilir
-        // const response = await api.get("/stats")
-        // setStats(response.data)
-
-        // Şu an için örnek data kullanıyoruz
-        setStats({
-          totalProducts: 124,
-          totalBranches: 3,
-          totalOrders: 856,
-          totalCategories: 8,
-          totalBrands: 2
-        })
-
-        // Son siparişleri getir
-        const ordersResponse = await api.get("/orders?limit=5")
-        setRecentOrders(ordersResponse.data.slice(0, 5))
+        // Tüm dashboard verilerini API'den çek
+        const response = await api.get("/api/dashboard")
         
-        // Sadece Super Admin için markaları getir
-        if (isSuperAdmin) {
-          try {
-            const brandsResponse = await api.get("/api/brands")
-            setBrands(brandsResponse.data.slice(0, 4)) // İlk 4 markayı göster
-          } catch(err) {
-            console.error("Markalar alınırken hata:", err)
-            // Örnek veri
-            setBrands([
-              { id: 1, name: "Çeşme Kahve", logo_url: "/logos/default-logo.png" },
-              { id: 2, name: "Deniz Cafe", logo_url: "/logos/default-logo.png" }
-            ])
+        if (response.data) {
+          // İstatistikler
+          if (response.data.stats) {
+            setStats({
+              total_products: response.data.stats.total_products || 0,
+              total_branches: response.data.stats.total_branches || 0,
+              total_orders: response.data.stats.total_orders || 0,
+              total_categories: response.data.stats.total_categories || 0,
+              total_brands: response.data.stats.total_brands || 0
+            })
+          }
+          
+          // Son siparişler
+          if (response.data.recentOrders && Array.isArray(response.data.recentOrders)) {
+            setRecentOrders(response.data.recentOrders)
+          }
+          
+          // Markalar (Super Admin için)
+          if (isSuperAdmin && response.data.brands && Array.isArray(response.data.brands)) {
+            setBrands(response.data.brands.slice(0, 4)) // İlk 4 markayı göster
           }
         }
       } catch (err) {
-        console.error("İstatistikler yüklenirken hata:", err)
+        console.error("Dashboard verileri yüklenirken hata:", err)
+        toast.error("Dashboard verileri yüklenemedi.")
+        
+        // Hata durumunda varsayılan veriler
+        setStats({
+          total_products: 0,
+          total_branches: 0,
+          total_orders: 0,
+          total_categories: 0,
+          total_brands: 0
+        })
+        setRecentOrders([])
+        setBrands([])
       } finally {
         setLoading(false)
       }
     }
 
-    fetchStats()
+    fetchDashboardData()
   }, [isSuperAdmin])
 
   // Admin paneli menü öğeleri
@@ -168,7 +176,7 @@ const Dashboard = () => {
               <h3 className="text-gray-500 text-sm font-medium">Toplam Marka</h3>
               <span className="text-3xl bg-pink-100 text-pink-800 p-2 rounded-lg">🏢</span>
             </div>
-            <p className="text-3xl font-bold text-gray-800">{stats.totalBrands}</p>
+            <p className="text-3xl font-bold text-gray-800">{stats.total_brands}</p>
             <p className="text-xs text-gray-500 mt-1">Aktif markalar</p>
           </div>
         )}
@@ -178,7 +186,7 @@ const Dashboard = () => {
             <h3 className="text-gray-500 text-sm font-medium">Toplam Ürün</h3>
             <span className="text-3xl bg-blue-100 text-blue-800 p-2 rounded-lg">📦</span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalProducts}</p>
+          <p className="text-3xl font-bold text-gray-800">{stats.total_products}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm şubeler</p>
         </div>
 
@@ -187,7 +195,7 @@ const Dashboard = () => {
             <h3 className="text-gray-500 text-sm font-medium">Şube Sayısı</h3>
             <span className="text-3xl bg-green-100 text-green-800 p-2 rounded-lg">🏪</span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalBranches}</p>
+          <p className="text-3xl font-bold text-gray-800">{stats.total_branches}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm lokasyonlar</p>
         </div>
 
@@ -196,7 +204,7 @@ const Dashboard = () => {
             <h3 className="text-gray-500 text-sm font-medium">Toplam Sipariş</h3>
             <span className="text-3xl bg-amber-100 text-amber-800 p-2 rounded-lg">🧾</span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalOrders}</p>
+          <p className="text-3xl font-bold text-gray-800">{stats.total_orders}</p>
           <p className="text-xs text-gray-500 mt-1">Tüm zamanlar</p>
         </div>
 
@@ -205,7 +213,7 @@ const Dashboard = () => {
             <h3 className="text-gray-500 text-sm font-medium">Kategori Sayısı</h3>
             <span className="text-3xl bg-purple-100 text-purple-800 p-2 rounded-lg">🏷️</span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalCategories}</p>
+          <p className="text-3xl font-bold text-gray-800">{stats.total_categories}</p>
           <p className="text-xs text-gray-500 mt-1">Aktif kategoriler</p>
         </div>
       </div>
@@ -290,8 +298,6 @@ const Dashboard = () => {
         ))}
       </div>
 
-      
-
       {/* Son Siparişler ve Hızlı İşlemler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -314,8 +320,8 @@ const Dashboard = () => {
                   <tbody>
                     {recentOrders.map((order) => (
                       <tr key={order.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3">{order.name}</td>
-                        <td className="py-3">{order.table_number}</td>
+                        <td className="py-3">{order.name || 'Anonim'}</td>
+                        <td className="py-3">{order.table_number || '-'}</td>
                         <td className="py-3 text-right font-medium text-green-600">{order.total_price} ₺</td>
                         <td className="py-3 text-right text-gray-500">{new Date(order.created_at).toLocaleDateString()}</td>
                       </tr>
