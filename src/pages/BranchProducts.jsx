@@ -1,5 +1,4 @@
-// src/pages/BranchProducts.jsx
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/axios";
 import { FiEdit2, FiTrash2, FiEye, FiEyeOff, FiPlus, FiUpload, FiDownload } from "react-icons/fi";
@@ -12,9 +11,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { SelectedBranchContext } from "../layout/MainLayout";
 import { useRef } from "react";
 
+// Loglama yardımcı fonksiyonu
+const logger = {
+  debug: process.env.NODE_ENV === 'development' ? console.debug : () => {},
+  log: process.env.NODE_ENV === 'development' ? console.log : () => {},
+  info: console.info,
+  warn: console.warn,
+  error: console.error
+};
+
 const BranchProductManager = () => {
   const { id: paramId } = useParams();
   const { currentUser, isSuperAdmin } = useAuth();
+  
   // MainLayout'dan seçilen şube ID'si
   const contextBranchId = useContext(SelectedBranchContext);
 
@@ -30,6 +39,10 @@ const BranchProductManager = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [branchLookup, setBranchLookup] = useState({});
+  const [lastFetchedBranchId, setLastFetchedBranchId] = useState(null);
+  const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
+  
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -43,6 +56,7 @@ const BranchProductManager = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const apiCallTimeoutRef = useRef(null);
 
   // Kategorilere göre arkaplan renkleri
   const categoryColors = {
@@ -58,135 +72,193 @@ const BranchProductManager = () => {
     "Çaylar": "bg-red-100 text-red-800",
   };
 
-  // Şubeleri getir
-  const fetchBranches = async () => {
+  // Şubeleri getiren fonksiyon - Cache'leme ile optimize edilmiş
+  const fetchBranches = useCallback(async () => {
     try {
       const response = await api.get("/api/branches");
-      setBranches(response.data);
+      const branchesData = response.data || [];
+      setBranches(branchesData);
+      
+      // Şube arama işlemlerini hızlandırmak için lookup tablosu oluştur
+      const lookup = {};
+      branchesData.forEach(branch => {
+        lookup[branch.id] = branch;
+      });
+      setBranchLookup(lookup);
+      
+      return branchesData;
     } catch (error) {
-      console.error("Şubeler yüklenirken hata:", error);
+      logger.error("Şubeler yüklenirken hata:", error);
       toast.error("Şubeler yüklenemedi!");
+      return [];
     }
-  };
+  }, []);
 
-  // Kategorileri getir
-  const fetchCategories = async () => {
+  // Kategorileri getiren fonksiyon
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await api.get("/api/categories");
-      setCategories(response.data);
+      setCategories(response.data || []);
     } catch (error) {
-      console.error("Kategoriler yüklenirken hata:", error);
+      logger.error("Kategoriler yüklenirken hata:", error);
       toast.error("Kategoriler yüklenemedi!");
     }
-  };
+  }, []);
 
-  // Şube ürünlerini getir
-  const fetchBranchProducts = async (branchId) => {
+  // Şube ürünlerini getiren fonksiyon - Debounce ve önbellek ile optimize edilmiş
+  const fetchBranchProducts = useCallback(async (branchId) => {
+    // Eğer şube ID'si yoksa işlem yapma
     if (!branchId) {
-      console.error("fetchBranchProducts: Şube ID'si belirtilmedi");
+      logger.warn("fetchBranchProducts: Şube ID'si belirtilmedi");
       setLoading(false);
       return;
     }
 
-    console.log(`${branchId} ID'li şubenin ürünleri getiriliyor...`);
-    setLoading(true);
-    try {
-      // Önce şube bilgilerini ve şablon bilgisini alalım
-      const branchResponse = await api.get(`/api/branches/${branchId}`);
-      const branch = branchResponse.data;
-      console.log("Şube bilgileri:", branch);
-
-      let productsResponse;
-
-      // Şubenin menü şablonu varsa, o şablondaki ürünleri getir
-      if (branch.menu_template_id) {
-        console.log(`Şube ${branchId} için menü şablonu ID: ${branch.menu_template_id}`);
-        productsResponse = await api.get(`/api/templates/menu/${branch.menu_template_id}/products`, {
-          params: { branchId }
-        });
-      } else {
-        // Menü şablonu yoksa, normal şube ürünlerini getir (geriye uyumluluk)
-        console.log(`Şube ${branchId} için şablon bulunamadı, normal şube ürünlerini getiriyorum`);
-        productsResponse = await api.get(`/api/products/branch/${branchId}`);
-      }
-
-      if (productsResponse.data && Array.isArray(productsResponse.data)) {
-        console.log(`${productsResponse.data.length} ürün başarıyla yüklendi`);
-        setProducts(productsResponse.data);
-      } else {
-        console.warn("API'den beklenmeyen yanıt formatı:", productsResponse.data);
-        setProducts([]);
-        toast.error("Ürün verileri alınırken bir sorun oluştu!");
-      }
-    } catch (error) {
-      console.error("Ürünler yüklenirken hata:", error);
-      setProducts([]);
-
-      // Hata mesajını daha açıklayıcı hale getir
-      if (error.response) {
-        // Sunucu yanıtı ile gelen hata
-        console.error("Sunucu yanıtı:", error.response.status, error.response.data);
-        toast.error(`Ürünler yüklenemedi! (${error.response.status}: ${error.response.data.error || 'Bilinmeyen hata'})`);
-      } else if (error.request) {
-        // İstek yapıldı ama yanıt alınamadı
-        console.error("Sunucudan yanıt alınamadı:", error.request);
-        toast.error("Sunucu yanıt vermiyor. Lütfen internet bağlantınızı kontrol edin!");
-      } else {
-        // İstek oluşturulurken bir şeyler yanlış gitti
-        toast.error(`Ürünler yüklenemedi: ${error.message}`);
-      }
-    } finally {
-      setLoading(false);
+    // Eğer zaten aynı şubenin ürünlerini yüklüyorsak ve bir API çağrısı devam ediyorsa işlemi iptal et
+    if (lastFetchedBranchId === branchId && isApiCallInProgress) {
+      logger.info(`${branchId} ID'li şubenin ürünleri zaten yükleniyor, tekrar istek yapılmayacak.`);
+      return;
     }
-  };
 
-  // Sayfa yüklendiğinde veya değiştiğinde
+    // Eğer daha önce bu şubenin ürünlerini yüklediysek ve ürünler varsa tekrar yükleme
+    if (lastFetchedBranchId === branchId && products.length > 0) {
+      logger.info(`${branchId} ID'li şubenin ürünleri zaten yüklü, tekrar yüklenmeyecek.`);
+      setLoading(false);
+      return;
+    }
+
+    // Önceki zamanlayıcıyı temizle
+    if (apiCallTimeoutRef.current) {
+      clearTimeout(apiCallTimeoutRef.current);
+    }
+
+    // API çağrısı için zamanlayıcı ayarla (debounce)
+    apiCallTimeoutRef.current = setTimeout(async () => {
+      // API çağrısı başlıyor
+      setIsApiCallInProgress(true);
+      setLoading(true);
+      logger.info(`${branchId} ID'li şubenin ürünleri getiriliyor...`);
+      
+      try {
+        // Önce şube bilgilerini ve şablon bilgisini alalım
+        const branchResponse = await api.get(`/api/branches/${branchId}`);
+        const branch = branchResponse.data;
+        
+        let productsResponse;
+
+        // Şubenin menü şablonu varsa, o şablondaki ürünleri getir
+        if (branch.menu_template_id) {
+          logger.info(`Şube ${branchId} için menü şablonu ID: ${branch.menu_template_id}`);
+          productsResponse = await api.get(`/api/products/branch/${branchId}`);
+        } else {
+          // Menü şablonu yoksa, normal şube ürünlerini getir (geriye uyumluluk)
+          logger.info(`Şube ${branchId} için şablon bulunamadı, normal şube ürünlerini getiriyorum`);
+          productsResponse = await api.get(`/api/products/branch/${branchId}`);
+        }
+
+        if (productsResponse.data && Array.isArray(productsResponse.data)) {
+          logger.info(`${productsResponse.data.length} ürün başarıyla yüklendi`);
+          setProducts(productsResponse.data);
+        } else {
+          logger.warn("API'den beklenmeyen yanıt formatı");
+          setProducts([]);
+        }
+        
+        // Son yüklenen şube ID'sini güncelle
+        setLastFetchedBranchId(branchId);
+      } catch (error) {
+        logger.error("Ürünler yüklenirken hata:", error);
+        setProducts([]);
+
+        // Hata mesajını daha açıklayıcı hale getir
+        if (error.response) {
+          logger.error("Sunucu yanıtı:", error.response.status, error.response.data);
+          toast.error(`Ürünler yüklenemedi! (${error.response.status}: ${error.response.data.error || 'Bilinmeyen hata'})`);
+        } else if (error.request) {
+          logger.error("Sunucudan yanıt alınamadı");
+          toast.error("Sunucu yanıt vermiyor. Lütfen internet bağlantınızı kontrol edin!");
+        } else {
+          toast.error(`Ürünler yüklenemedi: ${error.message}`);
+        }
+      } finally {
+        setLoading(false);
+        setIsApiCallInProgress(false);
+      }
+    }, 300); // 300ms debounce
+  }, [lastFetchedBranchId, isApiCallInProgress, products.length]);
+
+  // Şube ve kategori verilerini yükle
   useEffect(() => {
-    fetchBranches();
-    fetchCategories();
-  }, []);
+    const loadInitialData = async () => {
+      await Promise.all([
+        fetchBranches(),
+        fetchCategories()
+      ]);
+    };
+    
+    loadInitialData();
+    
+    // Temizleme fonksiyonu
+    return () => {
+      if (apiCallTimeoutRef.current) {
+        clearTimeout(apiCallTimeoutRef.current);
+      }
+    };
+  }, [fetchBranches, fetchCategories]);
 
   // Şube seçimi değişince
   useEffect(() => {
-    // Şubeler henüz yüklenmediyse işlem yapma
-    if (loading && branches.length === 0) return;
-
-    // URL'den gelen paramId, context'ten gelen contextBranchId veya şube yöneticisinin kendi şubesi
-    const effectiveBranchId = paramId || contextBranchId || (currentUser?.branch_id ? currentUser.branch_id.toString() : null);
-
-    console.log("Şube seçimi güncelleniyor:", {
-      paramId,
-      contextBranchId,
-      currentUserBranchId: currentUser?.branch_id,
-      effectiveBranchId,
-      branchesLoaded: branches.length > 0
-    });
-
-    if (effectiveBranchId) {
-      setSelectedBranchId(effectiveBranchId);
-      fetchBranchProducts(effectiveBranchId);
-
-      // URL güncelleme (optional)
-      if (!paramId) {
-        navigate(`/admin/branches/${effectiveBranchId}/products`, { replace: true });
+    const determineEffectiveBranchId = async () => {
+      // Şubeler henüz yüklenmediyse işlem yapma
+      if (loading && branches.length === 0) return;
+  
+      // URL'den gelen paramId, context'ten gelen contextBranchId veya şube yöneticisinin kendi şubesi
+      const effectiveBranchId = paramId || contextBranchId || (currentUser?.branch_id ? currentUser.branch_id.toString() : null);
+  
+      logger.debug("Şube seçimi güncelleniyor:", {
+        paramId,
+        contextBranchId,
+        currentUserBranchId: currentUser?.branch_id,
+        effectiveBranchId,
+        branchesLoaded: branches.length > 0
+      });
+  
+      if (effectiveBranchId) {
+        setSelectedBranchId(effectiveBranchId);
+        
+        // Eğer bu şube ID'si daha önce yüklendiyse ve ürünler mevcutsa tekrar yükleme yapma
+        if (lastFetchedBranchId !== effectiveBranchId) {
+          fetchBranchProducts(effectiveBranchId);
+        }
+  
+        // URL güncelleme (şube değiştiyse)
+        if (!paramId || paramId !== effectiveBranchId) {
+          navigate(`/admin/branches/${effectiveBranchId}/products`, { replace: true });
+        }
+      } else if (branches.length > 0) {
+        // Eğer hiçbir ID belirtilmediyse ve şubeler yüklendiyse
+        const firstBranchId = branches[0].id.toString();
+        logger.info("Varsayılan ilk şube kullanılıyor:", firstBranchId);
+        setSelectedBranchId(firstBranchId);
+        
+        // Yalnızca şube değiştiyse ürünleri yeniden yükle
+        if (lastFetchedBranchId !== firstBranchId) {
+          fetchBranchProducts(firstBranchId);
+        }
+  
+        navigate(`/admin/branches/${firstBranchId}/products`, { replace: true });
+      } else {
+        logger.error("Şube seçilemedi: Kullanılabilir şube bulunamadı");
+        setLoading(false);
+        toast.error("Kullanılabilir şube bulunamadı. Lütfen sistem yöneticinize başvurun.");
       }
-    } else if (branches.length > 0) {
-      // Eğer hiçbir ID belirtilmediyse ve şubeler yüklendiyse
-      const firstBranchId = branches[0].id.toString();
-      console.log("Varsayılan ilk şube kullanılıyor:", firstBranchId);
-      setSelectedBranchId(firstBranchId);
-      fetchBranchProducts(firstBranchId);
-
-      navigate(`/admin/branches/${firstBranchId}/products`, { replace: true });
-    } else {
-      console.error("Şube seçilemedi: Kullanılabilir şube bulunamadı");
-      setLoading(false); // Yükleme durumunu sonlandır
-      toast.error("Kullanılabilir şube bulunamadı. Lütfen sistem yöneticinize başvurun.");
-    }
-  }, [paramId, contextBranchId, branches, currentUser, loading, navigate]);
+    };
+  
+    determineEffectiveBranchId();
+  }, [paramId, contextBranchId, branches, currentUser, loading, navigate, fetchBranchProducts, lastFetchedBranchId]);
 
   // Ürün görünürlüğünü güncelle
-  const handleVisibilityToggle = async (product) => {
+  const handleVisibilityToggle = useCallback(async (product) => {
     try {
       // Ürün görünürlüğünü tersine çevir
       const newVisibility = !product.is_visible;
@@ -197,20 +269,22 @@ const BranchProductManager = () => {
         is_visible: newVisibility
       });
 
-      // UI'ı güncelle
-      setProducts(products.map(p =>
-        p.id === product.id ? { ...p, is_visible: newVisibility } : p
-      ));
+      // UI'ı güncelle - mevcut ürünler üzerinde değişiklik yap
+      setProducts(currentProducts => 
+        currentProducts.map(p =>
+          p.id === product.id ? { ...p, is_visible: newVisibility } : p
+        )
+      );
 
       toast.success(`${product.name} ${newVisibility ? 'görünür' : 'gizli'} yapıldı`);
     } catch (error) {
-      console.error("Görünürlük değiştirilirken hata:", error);
+      logger.error("Görünürlük değiştirilirken hata:", error);
       toast.error("İşlem başarısız oldu!");
     }
-  };
+  }, [selectedBranchId]);
 
   // Ürün stok durumunu güncelle
-  const handleStockUpdate = async (product, newStock) => {
+  const handleStockUpdate = useCallback(async (product, newStock) => {
     try {
       // Sayı olarak çevir ve negatif olmamasını sağla
       const stockCount = Math.max(0, parseInt(newStock) || 0);
@@ -222,19 +296,21 @@ const BranchProductManager = () => {
       });
 
       // UI'ı güncelle
-      setProducts(products.map(p =>
-        p.id === product.id ? { ...p, stock_count: stockCount } : p
-      ));
+      setProducts(currentProducts => 
+        currentProducts.map(p =>
+          p.id === product.id ? { ...p, stock_count: stockCount } : p
+        )
+      );
 
       toast.success(`${product.name} stok durumu güncellendi`);
     } catch (error) {
-      console.error("Stok güncellenirken hata:", error);
+      logger.error("Stok güncellenirken hata:", error);
       toast.error("Stok güncellenemedi!");
     }
-  };
+  }, [selectedBranchId]);
 
   // Ürün silme
-  const handleDelete = async (product) => {
+  const handleDelete = useCallback(async (product) => {
     // Super Admin değilse engelle
     if (!isSuperAdmin) {
       toast.error("Bu işlem için yetkiniz bulunmamaktadır");
@@ -249,17 +325,17 @@ const BranchProductManager = () => {
       await api.delete(`/api/products/${product.id}`);
 
       // UI'dan ürünü kaldır
-      setProducts(products.filter(p => p.id !== product.id));
+      setProducts(currentProducts => currentProducts.filter(p => p.id !== product.id));
 
       toast.success(`${product.name} başarıyla silindi`);
     } catch (error) {
-      console.error("Ürün silinirken hata:", error);
+      logger.error("Ürün silinirken hata:", error);
       toast.error("Ürün silinemedi!");
     }
-  };
+  }, [isSuperAdmin]);
 
   // Düzenlemek için formu hazırla
-  const handleEdit = (product) => {
+  const handleEdit = useCallback((product) => {
     setEditingProduct(product);
     setForm({
       name: product.name,
@@ -271,10 +347,10 @@ const BranchProductManager = () => {
       stock_count: product.stock_count || 0
     });
     setShowModal(true);
-  };
+  }, []);
 
   // Yeni ürün eklemek için formu hazırla
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     // Super Admin değilse engelle
     if (!isSuperAdmin) {
       toast.error("Bu işlem için yetkiniz bulunmamaktadır");
@@ -292,20 +368,20 @@ const BranchProductManager = () => {
       stock_count: 0
     });
     setShowModal(true);
-  };
+  }, [isSuperAdmin]);
 
   // Form değişikliklerini izle
-  const handleFormChange = (e) => {
+  const handleFormChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
 
     // Checkbox için checked değerini, diğerleri için value değerini kullan
     const inputValue = type === 'checkbox' ? checked : value;
 
-    setForm({ ...form, [name]: inputValue });
-  };
+    setForm(prevForm => ({ ...prevForm, [name]: inputValue }));
+  }, []);
 
   // Form gönderimi
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
 
     try {
@@ -367,146 +443,143 @@ const BranchProductManager = () => {
       setShowModal(false);
 
     } catch (error) {
-      console.error("Form gönderilirken hata:", error);
+      logger.error("Form gönderilirken hata:", error);
       toast.error("İşlem başarısız oldu!");
     }
-  };
+  }, [editingProduct, isSuperAdmin, selectedBranchId, form, fetchBranchProducts]);
 
   // Excel'e aktar
-  // BranchProducts.jsx dosyasında handleExportExcel fonksiyonunu güncelleyin:
+  const handleExportExcel = useCallback(() => {
+    // Doğrudan mevcut ürünleri kullan
+    
+    // Excel için data hazırla
+    const exportData = products.map(product => ({
+      'Ürün Adı': product.name,
+      'Kategori': product.category_name,
+      'Fiyat': product.price,
+      'Stok': product.stock_count || 0,
+      'Görünür': product.is_visible ? 'Evet' : 'Hayır',
+      'Açıklama': product.description || '',
+      'Görsel URL': product.image_url || '',
+      'Ürün ID': product.id
+    }));
 
-const handleExportExcel = () => {
-  // Doğrudan mevcut ürünleri kullan
-  
-  // Excel için data hazırla
-  const exportData = products.map(product => ({
-    'Ürün Adı': product.name,
-    'Kategori': product.category_name,
-    'Fiyat': product.price,
-    'Stok': product.stock_count || 0,
-    'Görünür': product.is_visible ? 'Evet' : 'Hayır',
-    'Açıklama': product.description || '',
-    'Görsel URL': product.image_url || '',
-    'Ürün ID': product.id
-  }));
+    // Excel dosyasını oluştur
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürünler");
 
-  // Excel dosyasını oluştur
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Ürünler");
+    // Dosyayı indir
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
 
-  // Dosyayı indir
-  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+    // Şube adını al
+    const branchName = branchLookup[selectedBranchId]?.name || "Sube";
 
-  // Şube adını al
-  const branchName = branches.find(b => b.id.toString() === selectedBranchId?.toString())?.name || "Sube";
+    // Dosya adında şube adı ve tarih bilgisi olsun
+    const date = new Date().toISOString().split('T')[0];
+    saveAs(data, `${branchName}_Urunler_${date}.xlsx`);
 
-  // Dosya adında şube adı ve tarih bilgisi olsun
-  const date = new Date().toISOString().split('T')[0];
-  saveAs(data, `${branchName}_Urunler_${date}.xlsx`);
-
-  toast.success("Excel dosyası indiriliyor...");
-};
+    toast.success("Excel dosyası indiriliyor...");
+  }, [products, branchLookup, selectedBranchId]);
 
   // Excel'den içe aktar
-// Excel'den içe aktar
-const handleImportExcel = async (e) => {
-  // Super Admin değilse engelle
-  if (!isSuperAdmin) {
-    toast.error("Bu işlem için yetkiniz bulunmamaktadır");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    return;
-  }
-
-  const file = e.target.files[0];
-  if (!file) return;
-
-  setUploadLoading(true);
-
-  try {
-    // Excel verilerini oku
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-    // Önce şube bilgilerini alalım
-    const branchCheck = await api.get(`/api/branches/${selectedBranchId}`);
-    const branch = branchCheck.data;
-
-    // Menü şablonu varsa yönetimi farklı yap
-    if (branch.menu_template_id) {
-      console.log(`Şube ${selectedBranchId} için menü şablonu ID: ${branch.menu_template_id} kullanılacak`);
-      
-      // Bu işlem için özel bir API endpointi oluşturmamız gerekiyor
-      const importData = {
-        branchId: selectedBranchId,
-        menuTemplateId: branch.menu_template_id,
-        products: jsonData.map(item => ({
-          name: item['Ürün Adı'] || item['Ürün'] || '',
-          category: item['Kategori'] || '',
-          price: parseFloat(item['Fiyat']) || 0,
-          stock_count: parseInt(item['Stok']) || 0,
-          is_visible: item['Görünür'] === 'Evet',
-          description: item['Açıklama'] || '',
-          image_url: item['Görsel URL'] || item['Görsel'] || ''
-        }))
-      };
-
-      // Şablona ürün ekleyecek yeni API çağrısı
-      await api.post(`/api/templates/import-template-products`, importData);
-      
-      toast.success("Şablon ürünleri başarıyla içe aktarıldı");
-    } else {
-      // Şablonsuz içe aktarma (klasik yöntem)
-      const products = jsonData.map(item => ({
-        Ürün: item['Ürün Adı'] || item['Ürün'] || '',
-        Kategori: item['Kategori'] || '',
-        Fiyat: parseFloat(item['Fiyat']) || 0,
-        Stok: parseInt(item['Stok']) || 0,
-        Görsel: item['Görsel URL'] || item['Görsel'] || '',
-        Açıklama: item['Açıklama'] || '',
-        BranchId: parseInt(selectedBranchId) // Burada şube ID'sini de gönderiyoruz
-      }));
-
-      // Backend'e gönder
-      const response = await api.post("/api/products/bulk", { 
-        products,
-        branchId: selectedBranchId  // Şube ID'sini ayrıca gönderelim
-      });
-
-      toast.success(`İçe aktarma tamamlandı: ${response.data.stats.inserted} ürün eklendi, ${response.data.stats.skipped} atlandı`);
+  const handleImportExcel = useCallback(async (e) => {
+    // Super Admin değilse engelle
+    if (!isSuperAdmin) {
+      toast.error("Bu işlem için yetkiniz bulunmamaktadır");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
     }
 
-    // Ürünleri yeniden yükle
-    fetchBranchProducts(selectedBranchId);
+    const file = e.target.files[0];
+    if (!file) return;
 
-  } catch (error) {
-    console.error("Excel içe aktarılırken hata:", error);
-    toast.error("Excel içe aktarılamadı!");
-  } finally {
-    setUploadLoading(false);
-    setShowUploadModal(false);
-    // Dosya seçiciyi sıfırla
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    setUploadLoading(true);
+
+    try {
+      // Excel verilerini oku
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      // Önce şube bilgilerini alalım
+      const branchCheck = await api.get(`/api/branches/${selectedBranchId}`);
+      const branch = branchCheck.data;
+
+      // Menü şablonu varsa yönetimi farklı yap
+      if (branch.menu_template_id) {
+        logger.info(`Şube ${selectedBranchId} için menü şablonu ID: ${branch.menu_template_id} kullanılacak`);
+        
+        // Bu işlem için özel bir API endpointi oluşturmamız gerekiyor
+        const importData = {
+          branchId: selectedBranchId,
+          menuTemplateId: branch.menu_template_id,
+          products: jsonData.map(item => ({
+            name: item['Ürün Adı'] || item['Ürün'] || '',
+            category: item['Kategori'] || '',
+            price: parseFloat(item['Fiyat']) || 0,
+            stock_count: parseInt(item['Stok']) || 0,
+            is_visible: item['Görünür'] === 'Evet',
+            description: item['Açıklama'] || '',
+            image_url: item['Görsel URL'] || item['Görsel'] || ''
+          }))
+        };
+
+        // Şablona ürün ekleyecek yeni API çağrısı
+        await api.post(`/api/templates/import-template-products`, importData);
+        
+        toast.success("Şablon ürünleri başarıyla içe aktarıldı");
+      } else {
+        // Şablonsuz içe aktarma (klasik yöntem)
+        const products = jsonData.map(item => ({
+          Ürün: item['Ürün Adı'] || item['Ürün'] || '',
+          Kategori: item['Kategori'] || '',
+          Fiyat: parseFloat(item['Fiyat']) || 0,
+          Stok: parseInt(item['Stok']) || 0,
+          Görsel: item['Görsel URL'] || item['Görsel'] || '',
+          Açıklama: item['Açıklama'] || '',
+          BranchId: parseInt(selectedBranchId) // Burada şube ID'sini de gönderiyoruz
+        }));
+
+        // Backend'e gönder
+        const response = await api.post("/api/products/bulk", { 
+          products,
+          branchId: selectedBranchId  // Şube ID'sini ayrıca gönderelim
+        });
+
+        toast.success(`İçe aktarma tamamlandı: ${response.data.stats.inserted} ürün eklendi, ${response.data.stats.skipped} atlandı`);
+      }
+
+      // Ürünleri yeniden yükle
+      fetchBranchProducts(selectedBranchId);
+
+    } catch (error) {
+      logger.error("Excel içe aktarılırken hata:", error);
+      toast.error("Excel içe aktarılamadı!");
+    } finally {
+      setUploadLoading(false);
+      setShowUploadModal(false);
+      // Dosya seçiciyi sıfırla
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-  }
-};
+  }, [isSuperAdmin, selectedBranchId, fetchBranchProducts]);
 
   // Filtreleme işlemleri
   const filteredProducts = products.filter(product => {
     // Arama terimini kontrol et
     const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (product.category_name && product.category_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // Kategori filtresini kontrol et
-    const matchesCategory = !selectedCategory || product.category_id.toString() === selectedCategory;
+    const matchesCategory = !selectedCategory || product.category_id?.toString() === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -541,7 +614,7 @@ const handleImportExcel = async (e) => {
               </select>
             ) : (
               <div className="text-lg font-medium text-gray-700 bg-gray-50 px-4 py-2 rounded-lg">
-                Şube: {branches.find(b => b.id.toString() === selectedBranchId?.toString())?.name || "Yükleniyor..."}
+                Şube: {branchLookup[selectedBranchId]?.name || "Yükleniyor..."}
               </div>
             )}
           </div>
