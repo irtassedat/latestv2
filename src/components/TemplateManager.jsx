@@ -371,16 +371,18 @@ const TemplateManager = () => {
   const handleManageMenuProducts = async (templateId) => {
     setProductLoading(true);
     try {
+      console.log(`Template ID ${templateId} için ürünler getiriliyor...`);
       // Şablondaki ürünleri getir
       const response = await api.get(`/api/templates/menu/${templateId}/products`);
-      const products = response.data;
+      console.log(`Şablon ürünleri başarıyla alındı:`, response.data);
 
       // Ürün yönetim modalını aç
-      setTemplateProducts(products);
+      setTemplateProducts(response.data);
       setCurrentTemplateId(templateId);
       setShowProductsModal(true);
     } catch (error) {
       console.error("Şablon ürünleri yüklenirken hata:", error);
+      console.error("Hata detayları:", error.response?.data || "Detay yok");
       toast.error("Şablon ürünleri yüklenemedi!");
     } finally {
       setProductLoading(false);
@@ -473,14 +475,50 @@ const TemplateManager = () => {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // Excel verilerini API'ye gönder
-      await api.post(`/api/templates/menu/${currentTemplateId}/products/batch`, jsonData);
+      console.log("Excel verisi okundu:", jsonData.slice(0, 3)); // İlk 3 satırı logla
+
+      // Excel verilerini işle - kategori ve ürün kontrolü yap
+      const processedData = [];
+
+      for (const item of jsonData) {
+        // Temel bilgileri kontrol et
+        if (!item['Ürün Adı'] && !item['Ürün']) {
+          console.warn("Ürün adı eksik, bu satır atlanıyor:", item);
+          continue;
+        }
+
+        // Ürün adını standartlaştır
+        const productName = item['Ürün Adı'] || item['Ürün'] || '';
+        const categoryName = item['Kategori'] || '';
+        const isVisible = item['Görünür'] === 'Evet'; // 'Evet' ise true, değilse false
+
+        processedData.push({
+          name: productName,
+          category: categoryName,
+          price: parseFloat(item['Fiyat']) || 0,
+          is_visible: isVisible,
+          description: item['Açıklama'] || '',
+          image_url: item['Görsel URL'] || item['Görsel'] || '',
+          stock_count: parseInt(item['Stok']) || 0
+        });
+      }
+
+      console.log(`${processedData.length} ürün işlendi, API'ye gönderiliyor...`);
+
+      // İşlenmiş verileri API'ye gönder (JSON formatında)
+      await api.post('/api/templates/import-template-products', {
+        branchId: null, // Bu aşamada şube ID'si olmayabilir
+        menuTemplateId: currentTemplateId,
+        products: processedData
+      });
+
       toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
 
       // Güncel ürünleri yeniden yükle
       handleManageMenuProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
+      console.error("Hata detayları:", error.response?.data || "Detay yok");
       toast.error("Menü şablonu ürünleri içe aktarılamadı");
     } finally {
       setProductLoading(false);
@@ -503,6 +541,8 @@ const TemplateManager = () => {
       "Kategori": product.category_name,
       "Görünür": product.is_visible ? "Evet" : "Hayır",
       "Açıklama": product.description || "",
+      "Fiyat": product.price || 0,
+      "Görsel URL": product.image_url || "",
       "Ürün ID": product.id
     }));
 
@@ -543,6 +583,8 @@ const TemplateManager = () => {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+      console.log("Excel fiyat verisi okundu:", jsonData.slice(0, 3)); // İlk 3 satırı logla
+
       // Excel verilerini API'ye gönder
       await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, jsonData);
       toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
@@ -551,6 +593,7 @@ const TemplateManager = () => {
       handleManagePriceProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
+      console.error("Hata detayları:", error.response?.data || "Detay yok");
       toast.error("Fiyat şablonu ürünleri içe aktarılamadı");
     } finally {
       setProductLoading(false);
@@ -1536,8 +1579,8 @@ const TemplateManager = () => {
                               <button
                                 onClick={() => handleProductVisibilityToggle(product.id, product.is_visible)}
                                 className={`p-1.5 rounded-full transition-colors ${product.is_visible
-                                    ? "bg-green-100 text-green-600 hover:bg-green-200"
-                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  ? "bg-green-100 text-green-600 hover:bg-green-200"
+                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                                   }`}
                                 title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
                               >

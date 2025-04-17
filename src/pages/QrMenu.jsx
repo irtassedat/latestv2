@@ -157,7 +157,6 @@ const QrMenu = () => {
   }, [isCartOpen, showFilterModal, isMenuOpen])
 
   // Şubeye ait ürünleri getir
-  // QrMenu.jsx içinde fetchBranchMenu fonksiyonu
   const fetchBranchMenu = async (branch_id) => {
     if (!branch_id) {
       console.log("Şube ID'si belirtilmedi, varsayılan şube ürünleri getiriliyor");
@@ -168,7 +167,11 @@ const QrMenu = () => {
           const defaultBranchId = branchesResponse.data[0].id;
           console.log(`Varsayılan şube ID'si: ${defaultBranchId}`);
 
-          // Varsayılan şubenin menüsünü getir (şablon bazlı)
+          // Varsayılan şube bilgilerini getir (menü/şablon bazlı)
+          const branchResponse = await api.get(`/api/branches/${defaultBranchId}`);
+          const defaultBranch = branchResponse.data;
+
+          // Varsayılan şubenin menüsünü getir
           const productsResponse = await api.get(`/api/branches/${defaultBranchId}/menu`);
           setProducts(productsResponse.data.products);
 
@@ -184,7 +187,12 @@ const QrMenu = () => {
 
     try {
       console.log(`${branch_id} ID'li şubenin menüsü getiriliyor...`);
-      // Şubenin menüsünü şablon bazlı olarak getir
+
+      // Şube bilgilerini al (şablon ID'leri, vs.)
+      const branchResponse = await api.get(`/api/branches/${branch_id}`);
+      const branch = branchResponse.data;
+
+      // Şubenin menüsünü getir
       const response = await api.get(`/api/branches/${branch_id}/menu`);
 
       if (response.data && response.data.products && response.data.products.length > 0) {
