@@ -55,6 +55,7 @@ const TemplateManager = () => {
   const [productFilter, setProductFilter] = useState("");
   const [productCategoryFilter, setProductCategoryFilter] = useState("");
   const [productLoading, setProductLoading] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Excel import için dosya referansı
   const fileInputRef = useRef(null);
@@ -367,15 +368,39 @@ const TemplateManager = () => {
     else if (index === 2) setCurrentType(templateTypes.INTEGRATION);
   };
 
+  // Şube ürünlerini yeniden yükle 
+  const handleRefreshProducts = async (templateId, showAll = false) => {
+    if (!templateId) return;
+    
+    setProductLoading(true);
+    try {
+      // API çağrısını güncelle: showAll true ise tüm ürünleri getir
+      const response = await api.get(`/api/templates/menu/${templateId}/products`, {
+        params: { onlyTemplateProducts: !showAll ? 'true' : 'false' }
+      });
+      
+      setTemplateProducts(response.data);
+    } catch (error) {
+      console.error("Ürünler yenilenirken hata:", error);
+      toast.error("Ürünler yenilenemedi!");
+    } finally {
+      setProductLoading(false);
+    }
+  };
+
   // Menü şablonundaki ürünleri yönetme fonksiyonu
   const handleManageMenuProducts = async (templateId) => {
     setProductLoading(true);
     try {
       console.log(`Template ID ${templateId} için ürünler getiriliyor...`);
-      // Şablondaki ürünleri getir
-      const response = await api.get(`/api/templates/menu/${templateId}/products`);
+      
+      // showAllProducts state'ini kullan
+      const response = await api.get(`/api/templates/menu/${templateId}/products`, {
+        params: { onlyTemplateProducts: !showAllProducts ? 'true' : 'false' }
+      });
+      
       console.log(`Şablon ürünleri başarıyla alındı:`, response.data);
-
+  
       // Ürün yönetim modalını aç
       setTemplateProducts(response.data);
       setCurrentTemplateId(templateId);
@@ -485,29 +510,29 @@ const TemplateManager = () => {
       toast.error("Lütfen önce bir menü şablonu seçin");
       return;
     }
-  
+
     const file = e.target.files[0];
     if (!file) return;
-  
+
     setProductLoading(true);
-  
+
     try {
       // Önce şube ID'sini bir kez getir
       const branchesResponse = await api.get("/api/branches");
       const defaultBranchId = branchesResponse.data[0]?.id || 1;
       console.log("Varsayılan şube ID'si:", defaultBranchId);
-      
+
       // Excel dosyasını oku
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-  
-      console.log("Excel verisi okundu:", jsonData.slice(0, 3)); 
-  
+
+      console.log("Excel verisi okundu:", jsonData.slice(0, 3));
+
       // Excel verilerini işle - kategori ve ürün kontrolü yap
       const processedData = [];
-  
+
       for (const item of jsonData) {
         // Temel bilgileri kontrol et
         if (!item['Ürün Adı']) {
@@ -518,7 +543,7 @@ const TemplateManager = () => {
           console.warn("Kategori eksik, bu satır atlanıyor:", item);
           continue;
         }
-  
+
         // İşlenmiş ürün verisi - ID ALANINI ÇIKARIYORUZ
         const processedItem = {
           name: item['Ürün Adı'],
@@ -529,45 +554,45 @@ const TemplateManager = () => {
           image_url: item['Görsel URL'] || '',
           stock_count: parseInt(item['Stok']) || 0
         };
-        
+
         // Eğer Excel dosyasında ID sütunu varsa, bunu çıkar
         // ID değerini backend belirlesin
         delete processedItem.id;
-        
+
         processedData.push(processedItem);
       }
-  
+
       // Sadece isim ve kategorisi olan ürünleri al
       const cleanProducts = processedData.filter(p => p.name && p.category);
-  
+
       if (cleanProducts.length === 0) {
         throw new Error("Geçerli ürün verisi bulunamadı. Her ürünün en az isim ve kategori bilgisi olmalıdır.");
       }
-  
+
       console.log(`${cleanProducts.length} ürün işlendi, API'ye gönderiliyor...`);
-      
+
       // Özel JSON formatı oluştur
       const importData = {
         branchId: defaultBranchId,
         menuTemplateId: currentTemplateId,
         products: cleanProducts
       };
-  
+
       // API'ye gönderilecek veriyi logla
       console.log("API'ye gönderilecek veri:", importData);
-  
+
       // Şablona ürün ekleyecek API çağrısı
       const response = await api.post('/api/templates/import-template-products', importData);
       console.log("API yanıtı:", response.data);
-  
+
       toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
-  
+
       // Güncel ürünleri yeniden yükle
       handleManageMenuProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
       console.error("Hata detayları:", error.response?.data || error.message);
-      
+
       // Daha açıklayıcı hata mesajı göster
       if (error.message?.includes("duplicate key value") || error.response?.data?.error?.includes("duplicate")) {
         toast.error("Bazı ürünler zaten sistemde mevcut. Lütfen yeni ürünler ekleyin veya mevcut ürünleri güncelleyin.");

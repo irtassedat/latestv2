@@ -534,8 +534,8 @@ const BranchProductManager = () => {
         }
 
         const importData = {
-          branchId: null,              // UI'da gösterilmiyor olabilir
-          menuTemplateId: currentTemplateId,
+          branchId: selectedBranchId, 
+          menuTemplateId: branch.menu_template_id,
           products: productsData
         };
 
