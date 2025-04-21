@@ -1499,7 +1499,7 @@ const TemplateManager = () => {
           </div>
         )}
 
-        {/* Menü Şablonu Ürün Yönetimi Modalı */}
+        {/* Menü Şablonu Ürün Yönetimi Modalı - Sistemdeki tüm ürünleri görme özelliği eklenmiş */}
         {showProductsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div
@@ -1525,7 +1525,7 @@ const TemplateManager = () => {
               </div>
 
               <div className="p-6">
-                {/* Excel Import/Export Butonları */}
+                {/* Excel Import/Export Butonları ve Tüm Ürünleri Göster Checkbox'ı */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   <input
                     type="file"
@@ -1551,6 +1551,24 @@ const TemplateManager = () => {
                     <FiDownload size={16} />
                     <span>Excel'e Dışa Aktar</span>
                   </button>
+                  
+                  {/* Sistemdeki tüm ürünleri göster checkbox'ı */}
+                  <div className="flex items-center ml-4">
+                    <input
+                      type="checkbox"
+                      id="showAllProducts"
+                      checked={showAllProducts}
+                      onChange={(e) => {
+                        setShowAllProducts(e.target.checked);
+                        // Checkbox değiştiğinde ürünleri yeniden getir
+                        handleRefreshProducts(currentTemplateId, e.target.checked);
+                      }}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <label htmlFor="showAllProducts" className="ml-2 text-sm text-gray-700">
+                      Sistemdeki tüm ürünleri göster
+                    </label>
+                  </div>
                 </div>
 
                 {/* Filtre ve Arama */}
@@ -1665,12 +1683,6 @@ const TemplateManager = () => {
                               >
                                 {product.is_visible ? <FiEye size={18} /> : <FiEyeOff size={18} />}
                               </button>
-                              <button
-                                onClick={handleMakeAllVisible}
-                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                              >
-                                Tümünü Görünür Yap
-                              </button>
                             </td>
                             <td className="px-4 py-3 border-b text-right font-medium">
                               {product.price} ₺
@@ -1679,6 +1691,19 @@ const TemplateManager = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+                
+                {/* Tümünü Görünür Yap Butonu - Tablodan sonra ayrı bir kontrol olarak */}
+                {filteredTemplateProducts.length > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleMakeAllVisible}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      <FiEye className="inline mr-2" size={16} />
+                      Tümünü Görünür Yap
+                    </button>
                   </div>
                 )}
 
@@ -1691,6 +1716,7 @@ const TemplateManager = () => {
                   <p className="text-sm text-blue-600">
                     Bu menü şablonunu kullanan şubeler yalnızca "Görünür" olarak işaretlenen ürünleri müşterilerine gösterecektir.
                     Excel ile toplu içe/dışa aktarma yapabilir veya her ürünün görünürlüğünü tek tek değiştirebilirsiniz.
+                    {showAllProducts && " Şu anda sistemdeki tüm ürünleri görüntülüyorsunuz."}
                   </p>
                 </div>
 
