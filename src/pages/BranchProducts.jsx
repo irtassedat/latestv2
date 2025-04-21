@@ -13,8 +13,8 @@ import { useRef } from "react";
 
 // Loglama yardımcı fonksiyonu
 const logger = {
-  debug: process.env.NODE_ENV === 'development' ? console.debug : () => {},
-  log: process.env.NODE_ENV === 'development' ? console.log : () => {},
+  debug: process.env.NODE_ENV === 'development' ? console.debug : () => { },
+  log: process.env.NODE_ENV === 'development' ? console.log : () => { },
   info: console.info,
   warn: console.warn,
   error: console.error
@@ -23,7 +23,7 @@ const logger = {
 const BranchProductManager = () => {
   const { id: paramId } = useParams();
   const { currentUser, isSuperAdmin } = useAuth();
-  
+
   // MainLayout'dan seçilen şube ID'si
   const contextBranchId = useContext(SelectedBranchContext);
 
@@ -42,7 +42,7 @@ const BranchProductManager = () => {
   const [branchLookup, setBranchLookup] = useState({});
   const [lastFetchedBranchId, setLastFetchedBranchId] = useState(null);
   const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
-  
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -78,14 +78,14 @@ const BranchProductManager = () => {
       const response = await api.get("/api/branches");
       const branchesData = response.data || [];
       setBranches(branchesData);
-      
+
       // Şube arama işlemlerini hızlandırmak için lookup tablosu oluştur
       const lookup = {};
       branchesData.forEach(branch => {
         lookup[branch.id] = branch;
       });
       setBranchLookup(lookup);
-      
+
       return branchesData;
     } catch (error) {
       logger.error("Şubeler yüklenirken hata:", error);
@@ -138,12 +138,12 @@ const BranchProductManager = () => {
       setIsApiCallInProgress(true);
       setLoading(true);
       logger.info(`${branchId} ID'li şubenin ürünleri getiriliyor...`);
-      
+
       try {
         // Önce şube bilgilerini ve şablon bilgisini alalım
         const branchResponse = await api.get(`/api/branches/${branchId}`);
         const branch = branchResponse.data;
-        
+
         let productsResponse;
 
         // Şubenin menü şablonu varsa, o şablondaki ürünleri getir
@@ -163,7 +163,7 @@ const BranchProductManager = () => {
           logger.warn("API'den beklenmeyen yanıt formatı");
           setProducts([]);
         }
-        
+
         // Son yüklenen şube ID'sini güncelle
         setLastFetchedBranchId(branchId);
       } catch (error) {
@@ -195,9 +195,9 @@ const BranchProductManager = () => {
         fetchCategories()
       ]);
     };
-    
+
     loadInitialData();
-    
+
     // Temizleme fonksiyonu
     return () => {
       if (apiCallTimeoutRef.current) {
@@ -211,10 +211,10 @@ const BranchProductManager = () => {
     const determineEffectiveBranchId = async () => {
       // Şubeler henüz yüklenmediyse işlem yapma
       if (loading && branches.length === 0) return;
-  
+
       // URL'den gelen paramId, context'ten gelen contextBranchId veya şube yöneticisinin kendi şubesi
       const effectiveBranchId = paramId || contextBranchId || (currentUser?.branch_id ? currentUser.branch_id.toString() : null);
-  
+
       logger.debug("Şube seçimi güncelleniyor:", {
         paramId,
         contextBranchId,
@@ -222,15 +222,15 @@ const BranchProductManager = () => {
         effectiveBranchId,
         branchesLoaded: branches.length > 0
       });
-  
+
       if (effectiveBranchId) {
         setSelectedBranchId(effectiveBranchId);
-        
+
         // Eğer bu şube ID'si daha önce yüklendiyse ve ürünler mevcutsa tekrar yükleme yapma
         if (lastFetchedBranchId !== effectiveBranchId) {
           fetchBranchProducts(effectiveBranchId);
         }
-  
+
         // URL güncelleme (şube değiştiyse)
         if (!paramId || paramId !== effectiveBranchId) {
           navigate(`/admin/branches/${effectiveBranchId}/products`, { replace: true });
@@ -240,12 +240,12 @@ const BranchProductManager = () => {
         const firstBranchId = branches[0].id.toString();
         logger.info("Varsayılan ilk şube kullanılıyor:", firstBranchId);
         setSelectedBranchId(firstBranchId);
-        
+
         // Yalnızca şube değiştiyse ürünleri yeniden yükle
         if (lastFetchedBranchId !== firstBranchId) {
           fetchBranchProducts(firstBranchId);
         }
-  
+
         navigate(`/admin/branches/${firstBranchId}/products`, { replace: true });
       } else {
         logger.error("Şube seçilemedi: Kullanılabilir şube bulunamadı");
@@ -253,7 +253,7 @@ const BranchProductManager = () => {
         toast.error("Kullanılabilir şube bulunamadı. Lütfen sistem yöneticinize başvurun.");
       }
     };
-  
+
     determineEffectiveBranchId();
   }, [paramId, contextBranchId, branches, currentUser, loading, navigate, fetchBranchProducts, lastFetchedBranchId]);
 
@@ -270,7 +270,7 @@ const BranchProductManager = () => {
       });
 
       // UI'ı güncelle - mevcut ürünler üzerinde değişiklik yap
-      setProducts(currentProducts => 
+      setProducts(currentProducts =>
         currentProducts.map(p =>
           p.id === product.id ? { ...p, is_visible: newVisibility } : p
         )
@@ -296,7 +296,7 @@ const BranchProductManager = () => {
       });
 
       // UI'ı güncelle
-      setProducts(currentProducts => 
+      setProducts(currentProducts =>
         currentProducts.map(p =>
           p.id === product.id ? { ...p, stock_count: stockCount } : p
         )
@@ -451,7 +451,7 @@ const BranchProductManager = () => {
   // Excel'e aktar
   const handleExportExcel = useCallback(() => {
     // Doğrudan mevcut ürünleri kullan
-    
+
     // Excel için data hazırla
     const exportData = products.map(product => ({
       'Ürün Adı': product.name,
@@ -513,25 +513,41 @@ const BranchProductManager = () => {
       // Menü şablonu varsa yönetimi farklı yap
       if (branch.menu_template_id) {
         logger.info(`Şube ${selectedBranchId} için menü şablonu ID: ${branch.menu_template_id} kullanılacak`);
-        
+
         // Bu işlem için özel bir API endpointi oluşturmamız gerekiyor
-        const importData = {
-          branchId: selectedBranchId,
-          menuTemplateId: branch.menu_template_id,
-          products: jsonData.map(item => ({
-            name: item['Ürün Adı'] || item['Ürün'] || '',
-            category: item['Kategori'] || '',
+        // Filter out any rows missing a product name or category, then map to the payload shape
+        const productsData = jsonData
+          .filter(item => item['Ürün Adı'] && item['Kategori']) // Sadece geçerli ürünleri al
+          .map(item => ({
+            name: item['Ürün Adı'],
+            category: item['Kategori'],
             price: parseFloat(item['Fiyat']) || 0,
             stock_count: parseInt(item['Stok']) || 0,
             is_visible: item['Görünür'] === 'Evet',
             description: item['Açıklama'] || '',
-            image_url: item['Görsel URL'] || item['Görsel'] || ''
-          }))
+            image_url: item['Görsel URL'] || ''
+          }));
+
+        // En az bir ürün olduğundan emin ol
+        if (productsData.length === 0) {
+          throw new Error("İçe aktarılacak geçerli ürün bulunamadı");
+        }
+
+        const importData = {
+          branchId: null,              // UI'da gösterilmiyor olabilir
+          menuTemplateId: currentTemplateId,
+          products: productsData
         };
+
+        console.log("API'ye gönderilecek veri:", importData);
 
         // Şablona ürün ekleyecek yeni API çağrısı
         await api.post(`/api/templates/import-template-products`, importData);
-        
+
+
+        // Şablona ürün ekleyecek yeni API çağrısı
+        await api.post(`/api/templates/import-template-products`, importData);
+
         toast.success("Şablon ürünleri başarıyla içe aktarıldı");
       } else {
         // Şablonsuz içe aktarma (klasik yöntem)
@@ -546,7 +562,7 @@ const BranchProductManager = () => {
         }));
 
         // Backend'e gönder
-        const response = await api.post("/api/products/bulk", { 
+        const response = await api.post("/api/products/bulk", {
           products,
           branchId: selectedBranchId  // Şube ID'sini ayrıca gönderelim
         });

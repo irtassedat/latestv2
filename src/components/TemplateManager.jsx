@@ -456,70 +456,124 @@ const TemplateManager = () => {
     }
   };
 
-  // Excel import fonksiyonu - Menü şablonu için
+  const handleMakeAllVisible = async () => {
+    try {
+      const productUpdates = templateProducts.map(product => ({
+        product_id: product.id,
+        is_visible: true
+      }));
+
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // UI'ı güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product => ({ ...product, is_visible: true }))
+      );
+
+      toast.success("Tüm ürünler görünür yapıldı");
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+
+  // Excel import fonksiyonu - Menü şablonu için (güncellenmiş)
   const handleMenuTemplateExcelImport = async (e) => {
     if (!currentTemplateId) {
       toast.error("Lütfen önce bir menü şablonu seçin");
       return;
     }
-
+  
     const file = e.target.files[0];
     if (!file) return;
-
+  
     setProductLoading(true);
-
+  
     try {
+      // Önce şube ID'sini bir kez getir
+      const branchesResponse = await api.get("/api/branches");
+      const defaultBranchId = branchesResponse.data[0]?.id || 1;
+      console.log("Varsayılan şube ID'si:", defaultBranchId);
+      
       // Excel dosyasını oku
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      console.log("Excel verisi okundu:", jsonData.slice(0, 3)); // İlk 3 satırı logla
-
+  
+      console.log("Excel verisi okundu:", jsonData.slice(0, 3)); 
+  
       // Excel verilerini işle - kategori ve ürün kontrolü yap
       const processedData = [];
-
+  
       for (const item of jsonData) {
         // Temel bilgileri kontrol et
-        if (!item['Ürün Adı'] && !item['Ürün']) {
+        if (!item['Ürün Adı']) {
           console.warn("Ürün adı eksik, bu satır atlanıyor:", item);
           continue;
         }
-
-        // Ürün adını standartlaştır
-        const productName = item['Ürün Adı'] || item['Ürün'] || '';
-        const categoryName = item['Kategori'] || '';
-        const isVisible = item['Görünür'] === 'Evet'; // 'Evet' ise true, değilse false
-
-        processedData.push({
-          name: productName,
-          category: categoryName,
+        if (!item['Kategori']) {
+          console.warn("Kategori eksik, bu satır atlanıyor:", item);
+          continue;
+        }
+  
+        // İşlenmiş ürün verisi - ID ALANINI ÇIKARIYORUZ
+        const processedItem = {
+          name: item['Ürün Adı'],
+          category: item['Kategori'],
           price: parseFloat(item['Fiyat']) || 0,
-          is_visible: isVisible,
+          is_visible: item['Görünür'] === 'Evet',
           description: item['Açıklama'] || '',
-          image_url: item['Görsel URL'] || item['Görsel'] || '',
+          image_url: item['Görsel URL'] || '',
           stock_count: parseInt(item['Stok']) || 0
-        });
+        };
+        
+        // Eğer Excel dosyasında ID sütunu varsa, bunu çıkar
+        // ID değerini backend belirlesin
+        delete processedItem.id;
+        
+        processedData.push(processedItem);
       }
-
-      console.log(`${processedData.length} ürün işlendi, API'ye gönderiliyor...`);
-
-      // İşlenmiş verileri API'ye gönder (JSON formatında)
-      await api.post('/api/templates/import-template-products', {
-        branchId: null, // Bu aşamada şube ID'si olmayabilir
+  
+      // Sadece isim ve kategorisi olan ürünleri al
+      const cleanProducts = processedData.filter(p => p.name && p.category);
+  
+      if (cleanProducts.length === 0) {
+        throw new Error("Geçerli ürün verisi bulunamadı. Her ürünün en az isim ve kategori bilgisi olmalıdır.");
+      }
+  
+      console.log(`${cleanProducts.length} ürün işlendi, API'ye gönderiliyor...`);
+      
+      // Özel JSON formatı oluştur
+      const importData = {
+        branchId: defaultBranchId,
         menuTemplateId: currentTemplateId,
-        products: processedData
-      });
-
+        products: cleanProducts
+      };
+  
+      // API'ye gönderilecek veriyi logla
+      console.log("API'ye gönderilecek veri:", importData);
+  
+      // Şablona ürün ekleyecek API çağrısı
+      const response = await api.post('/api/templates/import-template-products', importData);
+      console.log("API yanıtı:", response.data);
+  
       toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
-
+  
       // Güncel ürünleri yeniden yükle
       handleManageMenuProducts(currentTemplateId);
     } catch (error) {
       console.error("Excel içe aktarılırken hata:", error);
-      console.error("Hata detayları:", error.response?.data || "Detay yok");
-      toast.error("Menü şablonu ürünleri içe aktarılamadı");
+      console.error("Hata detayları:", error.response?.data || error.message);
+      
+      // Daha açıklayıcı hata mesajı göster
+      if (error.message?.includes("duplicate key value") || error.response?.data?.error?.includes("duplicate")) {
+        toast.error("Bazı ürünler zaten sistemde mevcut. Lütfen yeni ürünler ekleyin veya mevcut ürünleri güncelleyin.");
+      } else {
+        toast.error(`İçe aktarma hatası: ${error.message || error.response?.data?.error || "Bilinmeyen hata"}`);
+      }
     } finally {
       setProductLoading(false);
       if (fileInputRef.current) {
@@ -1585,6 +1639,12 @@ const TemplateManager = () => {
                                 title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
                               >
                                 {product.is_visible ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+                              </button>
+                              <button
+                                onClick={handleMakeAllVisible}
+                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Tümünü Görünür Yap
                               </button>
                             </td>
                             <td className="px-4 py-3 border-b text-right font-medium">

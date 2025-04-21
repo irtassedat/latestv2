@@ -173,7 +173,22 @@ const QrMenu = () => {
 
           // Varsayılan şubenin menüsünü getir
           const productsResponse = await api.get(`/api/branches/${defaultBranchId}/menu`);
-          setProducts(productsResponse.data.products);
+
+          // API yanıtını detaylı logla
+          console.log("API yanıtı:", productsResponse.data);
+
+          if (productsResponse.data && productsResponse.data.products) {
+            if (productsResponse.data.products.length > 0) {
+              console.log(`${productsResponse.data.products.length} ürün başarıyla yüklendi`);
+              setProducts(productsResponse.data.products);
+            } else {
+              console.warn("API'den dönen ürün listesi boş!");
+              loadFallbackProducts();
+            }
+          } else {
+            console.warn("API yanıtında products dizisi bulunamadı:", productsResponse.data);
+            loadFallbackProducts();
+          }
 
           // URL'i güncelle (sayfa yenilenmez)
           navigate(`/menu/${defaultBranchId}`, { replace: true });
@@ -191,19 +206,29 @@ const QrMenu = () => {
       // Şube bilgilerini al (şablon ID'leri, vs.)
       const branchResponse = await api.get(`/api/branches/${branch_id}`);
       const branch = branchResponse.data;
+      console.log("Şube detayları:", branch);
 
       // Şubenin menüsünü getir
       const response = await api.get(`/api/branches/${branch_id}/menu`);
+      console.log("Menü API yanıtı:", response.data);
 
       if (response.data && response.data.products && response.data.products.length > 0) {
         console.log(`${response.data.products.length} ürün başarıyla yüklendi`);
         setProducts(response.data.products);
       } else {
-        console.warn("Şube için ürün bulunamadı:", branch_id);
+        console.warn("Şube için ürün bulunamadı veya API yanıtı beklenen formatta değil:", response.data);
+        // Ürün bulunamama nedenini kontrol et
+        if (branch.menu_template_id && branch.price_template_id) {
+          console.warn(`Şablonlar doğru: Menü Şablonu=${branch.menu_template_id}, Fiyat Şablonu=${branch.price_template_id}`);
+          console.warn("Ancak bu şablonlarda görünür ürün yok veya API yanıtı beklenen formatta değil");
+        } else {
+          console.warn("Şube için menü veya fiyat şablonu atanmamış");
+        }
         loadFallbackProducts();
       }
     } catch (err) {
-      console.error("Menü yüklenirken hata:", err.message);
+      console.error("Menü yüklenirken hata:", err);
+      console.error("Hata detayları:", err.response?.data || err.message);
       loadFallbackProducts();
     }
   };
