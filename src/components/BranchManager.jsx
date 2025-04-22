@@ -34,9 +34,10 @@ const BranchManager = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrandId, setSelectedBrandId] = useState(brandId || "");
-  const [selectedView, setSelectedView] = useState("grid"); // "grid" veya "table"
+  const [selectedView, setSelectedView] = useState(localStorage.getItem('branchManagerView') || "grid"); 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [viewMode, setViewMode] = useState(brandId ? "brand" : "all"); // "all" veya "brand"
+  const [showBrandSelector, setShowBrandSelector] = useState(false); // Marka seçici modalı
   
   const [form, setForm] = useState({
     name: "",
@@ -129,12 +130,6 @@ const BranchManager = () => {
       await fetchBrands(); // Markaları getir
       await fetchAllBranches(); // Tüm şubeleri getir
       
-      // Kaydedilmiş görünüm modunu yükle
-      const savedView = localStorage.getItem('branchManagerView');
-      if (savedView) {
-        setSelectedView(savedView);
-      }
-      
       // URL'den brandId geldiğinde o markaya ait şubeleri getir
       if (brandId) {
         setSelectedBrandId(brandId);
@@ -184,6 +179,12 @@ const BranchManager = () => {
     }
   };
   
+  // Görünüm modunu değiştir ve localStorage'a kaydet
+  const handleViewChange = (view) => {
+    setSelectedView(view);
+    localStorage.setItem('branchManagerView', view);
+  };
+  
   // Görünüm modunu değiştir
   const toggleViewMode = () => {
     if (viewMode === "brand" && selectedBrandId) {
@@ -192,12 +193,17 @@ const BranchManager = () => {
       navigate("/admin/branches");
       setSelectedBrandId("");
     } else if (viewMode === "all" && brands.length > 0) {
-      const firstBrandId = brands[0].id;
-      setViewMode("brand");
-      setSelectedBrandId(firstBrandId);
-      fetchBranchesByBrand(firstBrandId);
-      navigate(`/admin/brands/${firstBrandId}/branches`);
+      setShowBrandSelector(true);
     }
+  };
+
+  // Bir markaya geçiş yap
+  const switchToBrand = (brandId) => {
+    setSelectedBrandId(brandId);
+    setViewMode("brand");
+    fetchBranchesByBrand(brandId);
+    navigate(`/admin/brands/${brandId}/branches`);
+    setShowBrandSelector(false);
   };
 
   // Şube ekleme/düzenleme modalını aç
@@ -466,10 +472,7 @@ const BranchManager = () => {
             {/* Görünüm Modu */}
             <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: "rgba(2, 43, 69, 0.2)" }}>
               <button 
-                onClick={() => {
-                  setSelectedView("grid");
-                  localStorage.setItem('branchManagerView', 'grid');
-                }}
+                onClick={() => handleViewChange("grid")}
                 className={`px-3 py-2 ${selectedView === "grid" ? "text-white" : ""}`}
                 style={{ 
                   backgroundColor: selectedView === "grid" ? theme.primary : "white",
@@ -485,10 +488,7 @@ const BranchManager = () => {
                 </svg>
               </button>
               <button 
-                onClick={() => {
-                  setSelectedView("table");
-                  localStorage.setItem('branchManagerView', 'table');
-                }}
+                onClick={() => handleViewChange("table")}
                 className={`px-3 py-2 ${selectedView === "table" ? "text-white" : ""}`}
                 style={{ 
                   backgroundColor: selectedView === "table" ? theme.primary : "white",
@@ -1145,7 +1145,7 @@ const BranchManager = () => {
                 <button
                   onClick={() => setConfirmDelete(null)}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                  style={{ 
+                  style={{
                     borderColor: theme.secondary,
                     color: theme.primary,
                     fontFamily: "'Nunito', 'Segoe UI', sans-serif",
@@ -1157,7 +1157,7 @@ const BranchManager = () => {
                 <button
                   onClick={() => handleDelete(confirmDelete)}
                   className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors"
-                  style={{ 
+                  style={{
                     backgroundColor: theme.danger,
                     fontFamily: "'Nunito', 'Segoe UI', sans-serif",
                     fontWeight: 600
@@ -1166,6 +1166,66 @@ const BranchManager = () => {
                   Evet, Sil
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Marka Seçici Modal */}
+      {showBrandSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold" style={{ color: theme.primary }}>
+                Marka Seçin
+              </h3>
+              <button
+                onClick={() => setShowBrandSelector(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {brands.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {brands.map(brand => (
+                  <div
+                    key={brand.id}
+                    onClick={() => switchToBrand(brand.id)}
+                    className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors flex items-center gap-3"
+                    style={{ borderColor: "rgba(2, 43, 69, 0.1)" }}
+                  >
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                      <FiBriefcase size={18} />
+                    </div>
+                    <div>
+                      <div className="font-medium">{brand.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {allBranches.filter(b => b.brand_id?.toString() === brand.id.toString()).length} şube
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-500">
+                Henüz marka bulunmamaktadır. Önce marka eklemelisiniz.
+              </p>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowBrandSelector(false)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                style={{
+                  borderColor: theme.secondary,
+                  color: theme.primary,
+                  fontWeight: 600
+                }}
+              >
+                İptal
+              </button>
             </div>
           </div>
         </div>
