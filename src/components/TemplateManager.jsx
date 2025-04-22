@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { FiEdit2, FiTrash2, FiPlus, FiInfo, FiSettings, FiCheck, FiX, FiUpload, FiDownload, FiEye, FiEyeOff, FiPackage } from "react-icons/fi";
 import { HiOutlineDocumentSearch } from "react-icons/hi";
+import { FiLink } from 'react-icons/fi';
+import { MdLinkOff } from 'react-icons/md';
 import api from "../lib/axios";
 import toast from "react-hot-toast";
 import { Tab } from '@headlessui/react';
@@ -73,7 +75,8 @@ const TemplateManager = () => {
     name: "",
     description: "",
     is_active: true,
-    year: new Date().getFullYear()
+    year: new Date().getFullYear(),
+    menu_template_id: "" // Menü şablonu ID'si eklendi
   });
 
   const [integrationForm, setIntegrationForm] = useState({
@@ -192,7 +195,8 @@ const TemplateManager = () => {
           name: template.name || "",
           description: template.description || "",
           is_active: template.is_active !== false,
-          year: template.year || new Date().getFullYear()
+          year: template.year || new Date().getFullYear(),
+          menu_template_id: template.menu_template_id || ""
         });
         setShowModal(true);
       }
@@ -227,7 +231,8 @@ const TemplateManager = () => {
           name: "",
           description: "",
           is_active: true,
-          year: new Date().getFullYear()
+          year: new Date().getFullYear(),
+          menu_template_id: "" // Boş başlar
         });
         setShowModal(true);
       }
@@ -371,14 +376,14 @@ const TemplateManager = () => {
   // Şube ürünlerini yeniden yükle 
   const handleRefreshProducts = async (templateId, showAll = false) => {
     if (!templateId) return;
-    
+
     setProductLoading(true);
     try {
       // API çağrısını güncelle: showAll true ise tüm ürünleri getir
       const response = await api.get(`/api/templates/menu/${templateId}/products`, {
         params: { onlyTemplateProducts: !showAll ? 'true' : 'false' }
       });
-      
+
       setTemplateProducts(response.data);
     } catch (error) {
       console.error("Ürünler yenilenirken hata:", error);
@@ -393,14 +398,14 @@ const TemplateManager = () => {
     setProductLoading(true);
     try {
       console.log(`Template ID ${templateId} için ürünler getiriliyor...`);
-      
+
       // showAllProducts state'ini kullan
       const response = await api.get(`/api/templates/menu/${templateId}/products`, {
         params: { onlyTemplateProducts: !showAllProducts ? 'true' : 'false' }
       });
-      
+
       console.log(`Şablon ürünleri başarıyla alındı:`, response.data);
-  
+
       // Ürün yönetim modalını aç
       setTemplateProducts(response.data);
       setCurrentTemplateId(templateId);
@@ -414,21 +419,71 @@ const TemplateManager = () => {
     }
   };
 
-  // Fiyat şablonundaki ürünleri yönetme fonksiyonu
+
   const handleManagePriceProducts = async (templateId) => {
     setProductLoading(true);
     try {
-      // Şablondaki ürün fiyatlarını getir
-      const response = await api.get(`/api/templates/price/${templateId}/products`);
-      const products = response.data;
+      const checkTemplate = templates.price.find(t => t.id.toString() === templateId.toString());
+      if (!checkTemplate) {
+        throw new Error(`ID: ${templateId} ile fiyat şablonu bulunamadı.`);
+      }
+
+      console.log("Fiyat şablonu yönetimi başlatılıyor:", checkTemplate.name);
+
+      try {
+        const templateResponse = await api.get(`/api/templates/price/${templateId}`);
+        const priceTemplate = templateResponse.data;
+        console.log("Fiyat şablonu detayları:", priceTemplate);
+
+        if (priceTemplate.menu_template_id) {
+          console.log(`Bağlı menü şablonu ID: ${priceTemplate.menu_template_id} için ürünleri getir`);
+
+          try {
+            const menuProductsResponse = await api.get(`/api/templates/menu/${priceTemplate.menu_template_id}/products`, {
+              params: { onlyTemplateProducts: 'true' }
+            });
+
+            const priceProductsResponse = await api.get(`/api/templates/price/${templateId}/products`);
+
+            const menuProducts = menuProductsResponse.data;
+            const priceProducts = priceProductsResponse.data;
+
+            console.log(`Menü şablonunda ${menuProducts.length} ürün bulundu, fiyat şablonunda ${priceProducts.length} ürün fiyatı mevcut`);
+
+            const mergedProducts = menuProducts.map(menuProduct => {
+              const priceProduct = priceProducts.find(p => p.id === menuProduct.id);
+              return {
+                ...menuProduct,
+                template_price: priceProduct?.template_price || menuProduct.price
+              };
+            });
+
+            setTemplatePriceProducts(mergedProducts);
+          } catch (innerError) {
+            console.error("Menü şablonu ürünleri alınırken hata:", innerError);
+            // Hata durumunda yine de devam et, normal fiyatları getirmeyi dene
+            throw new Error(`Menü şablonu ürünleri alınamadı: ${innerError.message}`);
+          }
+        } else {
+          console.log("Bağlı menü şablonu yok, tüm ürünlerin fiyatlarını getir");
+          // Eski davranış: Menü şablonu belirtilmemişse tüm ürünleri getir
+          const productsResponse = await api.get(`/api/templates/price/${templateId}/products`);
+          setTemplatePriceProducts(productsResponse.data);
+        }
+      } catch (detailError) {
+        console.error("Fiyat şablonu detayları alınırken hata:", detailError);
+        // Fiyat şablonu detayları alınamazsa doğrudan fiyat ürünlerini getirmeyi dene
+        console.log("Alternatif yöntemle sadece fiyat ürünlerini getiriyorum");
+        const fallbackResponse = await api.get(`/api/templates/price/${templateId}/products`);
+        setTemplatePriceProducts(fallbackResponse.data);
+      }
 
       // Fiyat yönetim modalını aç
-      setTemplatePriceProducts(products);
       setCurrentTemplateId(templateId);
       setShowPriceProductsModal(true);
     } catch (error) {
       console.error("Şablon ürün fiyatları yüklenirken hata:", error);
-      toast.error("Şablon ürün fiyatları yüklenemedi!");
+      toast.error(`Fiyat şablonu ürünleri yüklenemedi: ${error.message}`);
     } finally {
       setProductLoading(false);
     }
@@ -656,6 +711,10 @@ const TemplateManager = () => {
     setProductLoading(true);
 
     try {
+      // Önce fiyat şablonunu getir (menu_template_id'yi kontrol için)
+      const templateResponse = await api.get(`/api/templates/price/${currentTemplateId}`);
+      const priceTemplate = templateResponse.data;
+
       // Excel dosyasını oku
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
@@ -664,9 +723,37 @@ const TemplateManager = () => {
 
       console.log("Excel fiyat verisi okundu:", jsonData.slice(0, 3)); // İlk 3 satırı logla
 
-      // Excel verilerini API'ye gönder
-      await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, jsonData);
-      toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
+      // Eğer fiyat şablonuna bağlı bir menü şablonu varsa, sadece o menüdeki ürünleri filtrele
+      if (priceTemplate.menu_template_id) {
+        // Menü şablonundaki ürünleri getir
+        const menuProductsResponse = await api.get(`/api/templates/menu/${priceTemplate.menu_template_id}/products`, {
+          params: { onlyTemplateProducts: 'true' }
+        });
+
+        const menuProducts = menuProductsResponse.data;
+        const menuProductNames = menuProducts.map(p => p.name.toLowerCase());
+
+        // JSON verilerini filtrele - sadece menüde olan ürünleri al
+        const filteredJsonData = jsonData.filter(item => {
+          const productName = item['Ürün Adı']?.toLowerCase();
+          return productName && menuProductNames.includes(productName);
+        });
+
+        if (filteredJsonData.length === 0) {
+          toast.warning(`Excel dosyasında seçili menü şablonundaki ürünler bulunamadı. Lütfen menü şablonunuzla uyumlu bir dosya yükleyin.`);
+          setProductLoading(false);
+          return;
+        }
+
+        // Filtrelenmiş verileri API'ye gönder
+        await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, filteredJsonData);
+
+        toast.success(`Fiyat şablonu ürünleri başarıyla içe aktarıldı (${filteredJsonData.length} ürün)`);
+      } else {
+        // Eski davranış: Tüm ürünler için fiyat güncelle
+        await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, jsonData);
+        toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
+      }
 
       // Güncel ürünleri yeniden yükle
       handleManagePriceProducts(currentTemplateId);
@@ -732,6 +819,13 @@ const TemplateManager = () => {
       (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
     );
   });
+
+  // Şablon adını getir
+  const getTemplateName = (type, id) => {
+    if (!id) return "-";
+    const template = templates[type]?.find(t => t.id.toString() === id.toString());
+    return template ? template.name : "-";
+  };
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -1021,6 +1115,22 @@ const TemplateManager = () => {
                             </span>
                           </div>
 
+                          {/* Menü Şablonu Bağlantısı */}
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-sm text-gray-500">Menü Şablonu</span>
+                            {template.menu_template_id ? (
+                              <span className="py-1 px-2 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+                                <FiLink size={12} />
+                                {getTemplateName('menu', template.menu_template_id)}
+                              </span>
+                            ) : (
+                              <span className="py-1 px-2 text-xs rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                                <FiLink size={12} />
+                                Bağlantı Yok
+                              </span>
+                            )}
+                          </div>
+
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-sm text-gray-500">Durum</span>
                             <span className={`py-1 px-2 text-xs rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -1196,26 +1306,121 @@ const TemplateManager = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: theme.primary }}
-                    >
-                      Şablon Adı *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={currentType === templateTypes.MENU ? menuForm.name : priceForm.name}
-                      onChange={currentType === templateTypes.MENU ? handleMenuFormChange : handlePriceFormChange}
-                      className="w-full p-2 border rounded-lg focus:outline-none"
-                      style={{ borderColor: theme.secondary }}
-                      required
-                    />
-                  </div>
+                {currentType === templateTypes.MENU ? (
+                  /* Menü Şablonu Formu */
+                  <div className="space-y-4">
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-1"
+                        style={{ color: theme.primary }}
+                      >
+                        Şablon Adı *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={menuForm.name}
+                        onChange={handleMenuFormChange}
+                        className="w-full p-2 border rounded-lg focus:outline-none"
+                        style={{ borderColor: theme.secondary }}
+                        required
+                      />
+                    </div>
 
-                  {currentType === templateTypes.PRICE && (
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-1"
+                        style={{ color: theme.primary }}
+                      >
+                        Açıklama
+                      </label>
+                      <textarea
+                        name="description"
+                        value={menuForm.description}
+                        onChange={handleMenuFormChange}
+                        rows="3"
+                        className="w-full p-2 border rounded-lg focus:outline-none"
+                        style={{ borderColor: theme.secondary }}
+                      ></textarea>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="is_active"
+                          name="is_active"
+                          checked={menuForm.is_active}
+                          onChange={handleMenuFormChange}
+                          className="h-4 w-4 rounded focus:ring-0 border-2"
+                          style={{
+                            borderColor: theme.secondary,
+                            accentColor: theme.accent
+                          }}
+                        />
+                        <label
+                          htmlFor="is_active"
+                          className="ml-2 text-sm font-medium"
+                          style={{ color: theme.primary }}
+                        >
+                          Şablon aktif
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Fiyat Şablonu Formu */
+                  <div className="space-y-4">
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-1"
+                        style={{ color: theme.primary }}
+                      >
+                        Şablon Adı *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={priceForm.name}
+                        onChange={handlePriceFormChange}
+                        className="w-full p-2 border rounded-lg focus:outline-none"
+                        style={{ borderColor: theme.secondary }}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-1"
+                        style={{ color: theme.primary }}
+                      >
+                        Menü Şablonu
+                      </label>
+                      <select
+                        name="menu_template_id"
+                        value={priceForm.menu_template_id}
+                        onChange={handlePriceFormChange}
+                        className="w-full p-2 border rounded-lg focus:outline-none"
+                        style={{ borderColor: theme.secondary }}
+                      >
+                        <option value="">Şablon Seçin</option>
+                        {templates.menu.map(template => (
+                          <option key={template.id} value={template.id}>{template.name}</option>
+                        ))}
+                      </select>
+
+                      {priceForm.menu_template_id && (
+                        <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                          <h4 className="text-sm font-medium text-blue-700 mb-1">
+                            {getTemplateName('menu', priceForm.menu_template_id)}
+                          </h4>
+                          <p className="text-xs text-blue-600">
+                            Bu menü şablonundaki ürünler için fiyat belirleyebileceksiniz.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label
                         className="block text-sm font-medium mb-1"
@@ -1235,49 +1440,49 @@ const TemplateManager = () => {
                         required
                       />
                     </div>
-                  )}
 
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      style={{ color: theme.primary }}
-                    >
-                      Açıklama
-                    </label>
-                    <textarea
-                      name="description"
-                      value={currentType === templateTypes.MENU ? menuForm.description : priceForm.description}
-                      onChange={currentType === templateTypes.MENU ? handleMenuFormChange : handlePriceFormChange}
-                      rows="3"
-                      className="w-full p-2 border rounded-lg focus:outline-none"
-                      style={{ borderColor: theme.secondary }}
-                    ></textarea>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="is_active"
-                        name="is_active"
-                        checked={currentType === templateTypes.MENU ? menuForm.is_active : priceForm.is_active}
-                        onChange={currentType === templateTypes.MENU ? handleMenuFormChange : handlePriceFormChange}
-                        className="h-4 w-4 rounded focus:ring-0 border-2"
-                        style={{
-                          borderColor: theme.secondary,
-                          accentColor: theme.accent
-                        }}
-                      />
+                    <div>
                       <label
-                        htmlFor="is_active"
-                        className="ml-2 text-sm font-medium"
+                        className="block text-sm font-medium mb-1"
                         style={{ color: theme.primary }}
                       >
-                        Şablon aktif
+                        Açıklama
                       </label>
+                      <textarea
+                        name="description"
+                        value={priceForm.description}
+                        onChange={handlePriceFormChange}
+                        rows="3"
+                        className="w-full p-2 border rounded-lg focus:outline-none"
+                        style={{ borderColor: theme.secondary }}
+                      ></textarea>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="price_is_active"
+                          name="is_active"
+                          checked={priceForm.is_active}
+                          onChange={handlePriceFormChange}
+                          className="h-4 w-4 rounded focus:ring-0 border-2"
+                          style={{
+                            borderColor: theme.secondary,
+                            accentColor: theme.accent
+                          }}
+                        />
+                        <label
+                          htmlFor="price_is_active"
+                          className="ml-2 text-sm font-medium"
+                          style={{ color: theme.primary }}
+                        >
+                          Şablon aktif
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="mt-8 flex justify-end gap-3">
                   <button
@@ -1305,6 +1510,233 @@ const TemplateManager = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Fiyat Şablonu Ürün Fiyatları Modalı - Seçili menü şablonu ürünlerini göstermek için güncellendi */}
+        {showPriceProductsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+            >
+              <div
+                className="flex justify-between items-center p-4"
+                style={{ borderBottom: `1px solid ${theme.secondary}` }}
+              >
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: theme.primary }}
+                >
+                  Fiyat Şablonu Yönetimi
+                </h3>
+                <button
+                  onClick={() => setShowPriceProductsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6">
+                {/* Menü şablonu bilgisi - Yeni eklenen bölüm */}
+                {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id && (
+                  <div className="mb-4 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <FiLink className="text-blue-600" size={20} />
+                    <div>
+                      <p className="text-blue-700 font-medium">
+                        Bu fiyat şablonu {getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)} şablonuna bağlı
+                      </p>
+                      <p className="text-sm text-blue-600">
+                        Sadece bu menü şablonunda bulunan ürünler listelenmektedir
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Excel Import/Export Butonları */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <input
+                    type="file"
+                    ref={priceFileInputRef}
+                    onChange={handlePriceTemplateExcelImport}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    onClick={() => priceFileInputRef.current.click()}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={productLoading}
+                  >
+                    <FiUpload size={16} />
+                    <span>Excel'den Fiyat İçe Aktar</span>
+                  </button>
+
+                  <button
+                    onClick={handlePriceTemplateExcelExport}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={productLoading || templatePriceProducts.length === 0}
+                  >
+                    <FiDownload size={16} />
+                    <span>Fiyatları Excel'e Aktar</span>
+                  </button>
+                </div>
+
+                {/* Filtre ve Arama */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      placeholder="Ürün ara..."
+                      value={productFilter}
+                      onChange={e => setProductFilter(e.target.value)}
+                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
+                    />
+                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
+                  </div>
+
+                  <select
+                    value={productCategoryFilter}
+                    onChange={e => setProductCategoryFilter(e.target.value)}
+                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
+                  >
+                    <option value="">Tüm Kategoriler</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ürün Fiyat Listesi */}
+                {productLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : filteredTemplatePriceProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
+                    <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
+                    <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTemplatePriceProducts.map(product => (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "/uploads/guncellenecek.jpg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                      No Image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                      {product.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              {product.category_name ? (
+                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  {product.category_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
+                              {product.price} ₺
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center justify-end">
+                                <input
+                                  type="number"
+                                  className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  value={product.template_price || product.price}
+                                  min="0"
+                                  step="0.01"
+                                  onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
+                                  onBlur={(e) => {
+                                    // Boş değer veya 0 ise gerçek fiyatı kullan
+                                    if (!e.target.value || parseFloat(e.target.value) <= 0) {
+                                      handlePriceUpdate(product.id, product.price);
+                                    }
+                                  }}
+                                />
+                                <span className="ml-2 text-gray-700">₺</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Bilgi Notu */}
+                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                  <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
+                    <FiInfo size={16} />
+                    <span>Fiyat Şablonu Hakkında</span>
+                  </h4>
+                  <p className="text-sm text-amber-600">
+                    {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id
+                      ? `Bu fiyat şablonu, seçili "${getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)}" menü şablonundaki ürünler için fiyat belirlemenizi sağlar.`
+                      : "Fiyat şablonunu bir menü şablonuna bağlarsanız, sadece o menüdeki ürünler için fiyat belirleyebilirsiniz. Bu sayede daha kontrollü fiyatlandırma yapabilirsiniz."
+                    }
+                  </p>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowPriceProductsModal(false)}
+                    className="px-4 py-2 text-white rounded-lg"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1499,7 +1931,7 @@ const TemplateManager = () => {
           </div>
         )}
 
-        {/* Menü Şablonu Ürün Yönetimi Modalı - Sistemdeki tüm ürünleri görme özelliği eklenmiş */}
+        {/* Menü Şablonu Ürün Yönetimi Modalı */}
         {showProductsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div
@@ -1551,7 +1983,7 @@ const TemplateManager = () => {
                     <FiDownload size={16} />
                     <span>Excel'e Dışa Aktar</span>
                   </button>
-                  
+
                   {/* Sistemdeki tüm ürünleri göster checkbox'ı */}
                   <div className="flex items-center ml-4">
                     <input
@@ -1693,7 +2125,7 @@ const TemplateManager = () => {
                     </table>
                   </div>
                 )}
-                
+
                 {/* Tümünü Görünür Yap Butonu - Tablodan sonra ayrı bir kontrol olarak */}
                 {filteredTemplateProducts.length > 0 && (
                   <div className="mt-4 flex justify-end">
@@ -1723,216 +2155,6 @@ const TemplateManager = () => {
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setShowProductsModal(false)}
-                    className="px-4 py-2 text-white rounded-lg"
-                    style={{ backgroundColor: theme.primary }}
-                  >
-                    Kapat
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fiyat Şablonu Ürün Fiyatları Modalı */}
-        {showPriceProductsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
-            >
-              <div
-                className="flex justify-between items-center p-4"
-                style={{ borderBottom: `1px solid ${theme.secondary}` }}
-              >
-                <h3
-                  className="text-xl font-semibold"
-                  style={{ color: theme.primary }}
-                >
-                  Fiyat Şablonu Yönetimi
-                </h3>
-                <button
-                  onClick={() => setShowPriceProductsModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="p-6">
-                {/* Excel Import/Export Butonları */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  <input
-                    type="file"
-                    ref={priceFileInputRef}
-                    onChange={handlePriceTemplateExcelImport}
-                    accept=".xlsx, .xls"
-                    style={{ display: 'none' }}
-                  />
-                  <button
-                    onClick={() => priceFileInputRef.current.click()}
-                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    disabled={productLoading}
-                  >
-                    <FiUpload size={16} />
-                    <span>Excel'den Fiyat İçe Aktar</span>
-                  </button>
-
-                  <button
-                    onClick={handlePriceTemplateExcelExport}
-                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    disabled={productLoading || templatePriceProducts.length === 0}
-                  >
-                    <FiDownload size={16} />
-                    <span>Fiyatları Excel'e Aktar</span>
-                  </button>
-                </div>
-
-                {/* Filtre ve Arama */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <input
-                      type="text"
-                      placeholder="Ürün ara..."
-                      value={productFilter}
-                      onChange={e => setProductFilter(e.target.value)}
-                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
-                    />
-                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
-                  </div>
-
-                  <select
-                    value={productCategoryFilter}
-                    onChange={e => setProductCategoryFilter(e.target.value)}
-                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
-                  >
-                    <option value="">Tüm Kategoriler</option>
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Ürün Fiyat Listesi */}
-                {productLoading ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div
-                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
-                      style={{ borderColor: theme.primary }}
-                    ></div>
-                  </div>
-                ) : filteredTemplatePriceProducts.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-lg">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
-                    <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
-                    <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTemplatePriceProducts.map(product => (
-                          <tr key={product.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 border-b">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
-                                  {product.image_url ? (
-                                    <img
-                                      src={product.image_url}
-                                      alt={product.name}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = "/uploads/guncellenecek.jpg";
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
-                                      No Image
-                                    </div>
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-medium">{product.name}</div>
-                                  {product.description && (
-                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                      {product.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 border-b">
-                              {product.category_name ? (
-                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                  {product.category_name}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
-                              {product.price} ₺
-                            </td>
-                            <td className="px-4 py-3 border-b">
-                              <div className="flex items-center justify-end">
-                                <input
-                                  type="number"
-                                  className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  value={product.template_price || product.price}
-                                  min="0"
-                                  step="0.01"
-                                  onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
-                                  onBlur={(e) => {
-                                    // Boş değer veya 0 ise gerçek fiyatı kullan
-                                    if (!e.target.value || parseFloat(e.target.value) <= 0) {
-                                      handlePriceUpdate(product.id, product.price);
-                                    }
-                                  }}
-                                />
-                                <span className="ml-2 text-gray-700">₺</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Bilgi Notu */}
-                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
-                  <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
-                    <FiInfo size={16} />
-                    <span>Fiyat Şablonu Hakkında</span>
-                  </h4>
-                  <p className="text-sm text-amber-600">
-                    Bu fiyat şablonunu kullanan şubeler için özel fiyatlar tanımlayabilirsiniz. Excel ile toplu fiyat güncellemesi
-                    yapabilir veya ürünlerin fiyatlarını tek tek değiştirebilirsiniz. Değişiklikler anlık olarak kaydedilir.
-                  </p>
-                </div>
-
-                <div className="mt-6 flex justify-end">
-                  <button
-                    onClick={() => setShowPriceProductsModal(false)}
                     className="px-4 py-2 text-white rounded-lg"
                     style={{ backgroundColor: theme.primary }}
                   >
