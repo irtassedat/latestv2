@@ -97,12 +97,15 @@ const EnhancedTemplateManager = () => {
       options: {}
     }
   });
-  // 2. Şablon kopyalama ile ilgili state
+
+  // Şablon kopyalama ile ilgili state
   const [copyingTemplate, setCopyingTemplate] = useState(null);
   const [copyName, setCopyName] = useState("");
   const [copyDetails, setCopyDetails] = useState(null);
   const [copyLoading, setCopyLoading] = useState(false);
   const [copyStep, setCopyStep] = useState(0);
+  const [newTemplateInfo, setNewTemplateInfo] = useState(null);
+  const [copyResults, setCopyResults] = useState(null);
 
   // LocalStorage'dan görünüm tercihini yükle
   useEffect(() => {
@@ -169,70 +172,100 @@ const EnhancedTemplateManager = () => {
     fetchCategories();
   }, []);
 
-  // Şablon kopyalama işlemini başlatan fonksiyon - Bu fonksiyonu en üst seviyede tanımladık
   const handleInitiateCopy = async (template, type) => {
     try {
-      // Kopyalama yükleniyor durumunu başlat
       setCopyLoading(true);
-
-      // Kopyalanacak şablonu ve varsayılan adını ayarla
       setCopyingTemplate({ ...template, type });
       setCopyName(`${template.name} - Kopya`);
 
-      // Şablon detaylarını getir - Her şablon türü için farklı işlem
-      let details = { items: 0, categories: new Set() };
+      // Daha detaylı bilgiler topla
+      let details = {
+        items: 0,
+        categories: new Set(),
+        lastUpdated: template.updated_at,
+        customFields: []
+      };
 
       if (type === templateTypes.MENU) {
-        // Menü şablonundaki görünür ürünleri getir
-        console.log(`Menü şablonu (ID: ${template.id}) ürünleri getiriliyor...`);
-
         const productsResponse = await api.get(`/api/templates/menu/${template.id}/products`, {
           params: { onlyTemplateProducts: 'true' }
         });
 
         if (productsResponse?.data) {
           const products = productsResponse.data;
+
           details.items = products.length;
 
-          // Benzersiz kategorileri hesapla
-          details.categories = new Set(products.map(p => p.category_name).filter(Boolean));
+          const categories = new Set();
+          const categoryStats = {};
 
-          console.log(`${details.items} ürün ve ${details.categories.size} kategori bulundu`);
+          products.forEach(p => {
+            if (p.category_name) {
+              categories.add(p.category_name);
+
+              if (!categoryStats[p.category_name]) {
+                categoryStats[p.category_name] = 0;
+              }
+              categoryStats[p.category_name]++;
+            }
+          });
+
+          details.categories = categories;
+          details.categoryStats = categoryStats;
+
+          details.visibleItems = products.filter(p => p.is_visible).length;
+
+          details.topCategories = Object.entries(categoryStats)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name, count]) => ({ name, count }));
         }
       }
       else if (type === templateTypes.PRICE) {
-        // Fiyat şablonundaki fiyat bilgilerini getir
-        console.log(`Fiyat şablonu (ID: ${template.id}) ürünleri getiriliyor...`);
-
         const priceResponse = await api.get(`/api/templates/price/${template.id}/products`);
 
         if (priceResponse?.data) {
           const priceProducts = priceResponse.data;
           details.items = priceProducts.length;
 
-          // Fiyat ayarlanmış ürün sayısını hesapla
-          const productsWithCustomPrice = priceProducts.filter(p =>
+          const customPriceProducts = priceProducts.filter(p =>
             p.template_price && p.template_price !== p.price
-          ).length;
+          );
 
-          details.customPrices = productsWithCustomPrice;
+          details.customPrices = customPriceProducts.length;
 
-          // Bağlı menü şablonu adını getir
+          if (customPriceProducts.length > 0) {
+            let totalPriceChange = 0;
+            let priceChanges = {
+              increased: 0,
+              decreased: 0,
+              same: 0
+            };
+
+            customPriceProducts.forEach(p => {
+              const originalPrice = p.price || 0;
+              const templatePrice = p.template_price || 0;
+              const diff = templatePrice - originalPrice;
+
+              totalPriceChange += diff;
+
+              if (diff > 0) priceChanges.increased++;
+              else if (diff < 0) priceChanges.decreased++;
+              else priceChanges.same++;
+            });
+
+            details.priceChanges = priceChanges;
+            details.avgPriceChange = totalPriceChange / customPriceProducts.length;
+          }
+
           if (template.menu_template_id) {
             details.linkedMenu = getTemplateName('menu', template.menu_template_id);
             details.linkedMenuId = template.menu_template_id;
+            details.keepMenuLink = true;
           }
-
-          console.log(`${details.items} ürün fiyatı bulundu (${details.customPrices} özel fiyat)`);
         }
       }
-      else if (type === templateTypes.INTEGRATION) {
-        // Entegrasyon için ekstra bilgiye genelde gerek yok
-        details.integrationType = template.type;
-        console.log(`Entegrasyon türü: ${details.integrationType}`);
-      }
 
-      // Şablon detaylarını state'e kaydet ve kopyalama adımını başlat
       setCopyDetails(details);
       setCopyStep(0);
     } catch (error) {
@@ -250,12 +283,17 @@ const EnhancedTemplateManager = () => {
     try {
       setCopyLoading(true);
       let newCopyId = null;
+      let copyResults = {
+        success: false,
+        templateId: null,
+        copiedItems: 0,
+        categories: 0,
+        details: []
+      };
 
       // Şablon tipine göre farklı kopyalama işlemleri
       if (copyingTemplate.type === templateTypes.MENU) {
-        console.log(`Menü şablonu kopyalanıyor... (ID: ${copyingTemplate.id})`);
 
-        // 1. Önce şablonun kendisini kopyala
         const copyResponse = await api.post("/api/templates/menu", {
           name: copyName,
           description: copyingTemplate.description,
@@ -265,14 +303,12 @@ const EnhancedTemplateManager = () => {
         newCopyId = copyResponse.data.id;
         console.log(`Yeni menü şablonu oluşturuldu (ID: ${newCopyId})`);
 
-        // 2. Eski şablondaki ürünleri getir
         const productsResponse = await api.get(`/api/templates/menu/${copyingTemplate.id}/products`, {
           params: { onlyTemplateProducts: 'true' }
         });
 
         const products = productsResponse.data;
 
-        // 3. Ürünleri yeni şablona ekle
         if (products && products.length > 0) {
           console.log(`${products.length} ürün kopyalanıyor...`);
 
@@ -285,13 +321,21 @@ const EnhancedTemplateManager = () => {
             products: productUpdates
           });
 
-          console.log(`${products.length} ürün başarıyla kopyalandı`);
+          copyResults = {
+            success: true,
+            templateId: newCopyId,
+            copiedItems: products.length,
+            categories: copyDetails.categories.size,
+            details: [
+              `${products.length} ürün başarıyla kopyalandı`,
+              `${copyDetails.visibleItems} görünür ürün`,
+              `${copyDetails.categories.size} farklı kategoride ürün`
+            ]
+          };
         }
       }
       else if (copyingTemplate.type === templateTypes.PRICE) {
-        console.log(`Fiyat şablonu kopyalanıyor... (ID: ${copyingTemplate.id})`);
 
-        // 1. Önce şablonun kendisini kopyala
         const copyResponse = await api.post("/api/templates/price", {
           name: copyName,
           description: copyingTemplate.description,
@@ -302,7 +346,6 @@ const EnhancedTemplateManager = () => {
         });
 
         newCopyId = copyResponse.data.id;
-        console.log(`Yeni fiyat şablonu oluşturuldu (ID: ${newCopyId})`);
 
         // 2. Eski şablondaki fiyatları getir
         const priceProductsResponse = await api.get(`/api/templates/price/${copyingTemplate.id}/products`);
@@ -310,7 +353,6 @@ const EnhancedTemplateManager = () => {
 
         // 3. Fiyatları yeni şablona ekle
         if (priceProducts && priceProducts.length > 0) {
-          console.log(`${priceProducts.length} ürün fiyatı kopyalanıyor...`);
 
           const priceUpdates = priceProducts.map(product => ({
             product_id: product.id,
@@ -321,13 +363,29 @@ const EnhancedTemplateManager = () => {
             products: priceUpdates
           });
 
-          console.log(`${priceProducts.length} ürün fiyatı başarıyla kopyalandı`);
+          const details = [];
+          details.push(`${priceProducts.length} ürün fiyatı başarıyla kopyalandı`);
+
+          if (copyDetails.customPrices > 0) {
+            details.push(`${copyDetails.customPrices} özel fiyat ayarı korundu`);
+          }
+
+          if (copyDetails.keepMenuLink && copyDetails.linkedMenu) {
+            details.push(`"${copyDetails.linkedMenu}" menü şablonu bağlantısı korundu`);
+          }
+
+          copyResults = {
+            success: true,
+            templateId: newCopyId,
+            copiedItems: priceProducts.length,
+            customPrices: copyDetails.customPrices,
+            linkedMenu: copyDetails.keepMenuLink ? copyDetails.linkedMenu : null,
+            details: details
+          };
         }
       }
       else if (copyingTemplate.type === templateTypes.INTEGRATION) {
-        console.log(`Entegrasyon şablonu kopyalanıyor... (ID: ${copyingTemplate.id})`);
 
-        // Entegrasyon şablonunu kopyala
         const copyResponse = await api.post("/api/integrations", {
           name: copyName,
           type: copyingTemplate.type,
@@ -337,13 +395,31 @@ const EnhancedTemplateManager = () => {
         });
 
         newCopyId = copyResponse.data.id;
-        console.log(`Yeni entegrasyon şablonu oluşturuldu (ID: ${newCopyId})`);
-      }
 
+        copyResults = {
+          success: true,
+          templateId: newCopyId,
+          details: [
+            "Entegrasyon ayarları başarıyla kopyalandı",
+            `Entegrasyon türü: ${copyingTemplate.type === 'delivery' ? 'Teslimat' :
+              copyingTemplate.type === 'payment' ? 'Ödeme' :
+                copyingTemplate.type === 'order' ? 'Sipariş' :
+                  copyingTemplate.type === 'menu' ? 'Menü' : 'Diğer'}`
+          ]
+        };
+      }
+      setCopyResults(copyResults);
       // Kopyalama başarılı, sonraki adıma geç
-      console.log(`"${copyName}" şablonu başarıyla oluşturuldu`);
       toast.success(`"${copyName}" şablonu başarıyla oluşturuldu`);
       setCopyStep(2);
+
+      if (newCopyId) {
+        setNewTemplateInfo({
+          id: newCopyId,
+          type: copyingTemplate.type,
+          name: copyName
+        });
+      }
 
     } catch (error) {
       console.error("Şablon kopyalanırken hata:", error);
@@ -1359,7 +1435,7 @@ const EnhancedTemplateManager = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                      {getFilteredTemplates(templateTypes.MENU).map((template) => (
+                        {getFilteredTemplates(templateTypes.MENU).map((template) => (
                           <tr key={template.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
@@ -2586,225 +2662,220 @@ const EnhancedTemplateManager = () => {
               className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
             >
-            <div
-                className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-                style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+              <div
+                className="flex justify-between items-center p-4"
+                style={{ borderBottom: `1px solid ${theme.secondary}` }}
               >
-                <div
-                  className="flex justify-between items-center p-4"
-                  style={{ borderBottom: `1px solid ${theme.secondary}` }}
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: theme.primary }}
                 >
-                  <h3
-                    className="text-xl font-semibold"
-                    style={{ color: theme.primary }}
-                  >
-                    Fiyat Şablonu Yönetimi
-                  </h3>
+                  Fiyat Şablonu Yönetimi
+                </h3>
+                <button
+                  onClick={() => setShowPriceProductsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6">
+                {/* Menü şablonu bilgisi */}
+                {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id && (
+                  <div className="mb-4 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <FiLink className="text-blue-600" size={20} />
+                    <div>
+                      <p className="text-blue-700 font-medium">
+                        Bu fiyat şablonu {getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)} şablonuna bağlı
+                      </p>
+                      <p className="text-sm text-blue-600">
+                        Sadece bu menü şablonunda bulunan ürünler listelenmektedir
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Excel Import/Export Butonları */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <input
+                    type="file"
+                    ref={priceFileInputRef}
+                    onChange={handlePriceTemplateExcelImport}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                  />
                   <button
-                    onClick={() => setShowPriceProductsModal(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    onClick={() => priceFileInputRef.current.click()}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={productLoading}
                   >
-                    ✕
+                    <FiUpload size={16} />
+                    <span>Excel'den Fiyat İçe Aktar</span>
+                  </button>
+
+                  <button
+                    onClick={handlePriceTemplateExcelExport}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={productLoading || templatePriceProducts.length === 0}
+                  >
+                    <FiDownload size={16} />
+                    <span>Fiyatları Excel'e Aktar</span>
                   </button>
                 </div>
 
-                <div className="p-6">
-                  {/* Menü şablonu bilgisi */}
-                  {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id && (
-                    <div className="mb-4 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                      <FiLink className="text-blue-600" size={20} />
-                      <div>
-                        <p className="text-blue-700 font-medium">
-                          Bu fiyat şablonu {getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)} şablonuna bağlı
-                        </p>
-                        <p className="text-sm text-blue-600">
-                          Sadece bu menü şablonunda bulunan ürünler listelenmektedir
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Excel Import/Export Butonları */}
-                  <div className="flex flex-wrap gap-2 mb-6">
+                {/* Filtre ve Arama */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
                     <input
-                      type="file"
-                      ref={priceFileInputRef}
-                      onChange={handlePriceTemplateExcelImport}
-                      accept=".xlsx, .xls"
-                      style={{ display: 'none' }}
+                      type="text"
+                      placeholder="Ürün ara..."
+                      value={productFilter}
+                      onChange={e => setProductFilter(e.target.value)}
+                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
                     />
-                    <button
-                      onClick={() => priceFileInputRef.current.click()}
-                      className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      disabled={productLoading}
-                    >
-                      <FiUpload size={16} />
-                      <span>Excel'den Fiyat İçe Aktar</span>
-                    </button>
-
-                    <button
-                      onClick={handlePriceTemplateExcelExport}
-                      className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      disabled={productLoading || templatePriceProducts.length === 0}
-                    >
-                      <FiDownload size={16} />
-                      <span>Fiyatları Excel'e Aktar</span>
-                    </button>
+                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
                   </div>
 
-                  {/* Filtre ve Arama */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <div className="relative flex-1 min-w-[200px]">
-                      <input
-                        type="text"
-                        placeholder="Ürün ara..."
-                        value={productFilter}
-                        onChange={e => setProductFilter(e.target.value)}
-                        className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
-                      />
-                      <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
-                    </div>
+                  <select
+                    value={productCategoryFilter}
+                    onChange={e => setProductCategoryFilter(e.target.value)}
+                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
+                  >
+                    <option value="">Tüm Kategoriler</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-                    <select
-                      value={productCategoryFilter}
-                      onChange={e => setProductCategoryFilter(e.target.value)}
-                      className="p-2 border border-gray-300 rounded-lg focus:outline-none"
-                    >
-                      <option value="">Tüm Kategoriler</option>
-                      {categories.map(category => (
-                        <option key={category.id} value={category.id.toString()}>{category.name}</option>
-                      ))}
-                    </select>
+                {/* Ürün Fiyat Listesi */}
+                {productLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
                   </div>
-
-                  {/* Ürün Fiyat Listesi */}
-                  {productLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div
-                        className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
-                        style={{ borderColor: theme.primary }}
-                      ></div>
-                    </div>
-                  ) : filteredTemplatePriceProducts.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-12 w-12 mx-auto mb-4 text-gray-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
-                      <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
-                      <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
+                ) : filteredTemplatePriceProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
+                    <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
+                    <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTemplatePriceProducts.map(product => (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "/uploads/guncellenecek.jpg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                      No Image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                      {product.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              {product.category_name ? (
+                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  {product.category_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
+                              {product.price} ₺
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center justify-end">
+                                <input
+                                  type="number"
+                                  className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  value={product.template_price || product.price}
+                                  min="0"
+                                  step="0.01"
+                                  onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
+                                  onBlur={(e) => {
+                                    // Boş değer veya 0 ise gerçek fiyatı kullan
+                                    if (!e.target.value || parseFloat(e.target.value) <= 0) {
+                                      handlePriceUpdate(product.id, product.price);
+                                    }
+                                  }}
+                                />
+                                <span className="ml-2 text-gray-700">₺</span>
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {filteredTemplatePriceProducts.map(product => (
-                            <tr key={product.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 border-b">
-                                <div className="flex items-center">
-                                  <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
-                                    {product.image_url ? (
-                                      <img
-                                        src={product.image_url}
-                                        alt={product.name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.target.onerror = null;
-                                          e.target.src = "/uploads/guncellenecek.jpg";
-                                        }}
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
-                                        No Image
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div className="font-medium">{product.name}</div>
-                                    {product.description && (
-                                      <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                        {product.description}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 border-b">
-                                {product.category_name ? (
-                                  <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                    {product.category_name}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400 text-sm">-</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
-                                {product.price} ₺
-                              </td>
-                              <td className="px-4 py-3 border-b">
-                                <div className="flex items-center justify-end">
-                                  <input
-                                    type="number"
-                                    className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={product.template_price || product.price}
-                                    min="0"
-                                    step="0.01"
-                                    onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
-                                    onBlur={(e) => {
-                                      // Boş değer veya 0 ise gerçek fiyatı kullan
-                                      if (!e.target.value || parseFloat(e.target.value) <= 0) {
-                                        handlePriceUpdate(product.id, product.price);
-                                      }
-                                    }}
-                                  />
-                                  <span className="ml-2 text-gray-700">₺</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Bilgi Notu */}
-                  <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
-                    <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
-                      <FiInfo size={16} />
-                      <span>Fiyat Şablonu Hakkında</span>
-                    </h4>
-                    <p className="text-sm text-amber-600">
-                      {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id
-                        ? `Bu fiyat şablonu, seçili "${getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)}" menü şablonundaki ürünler için fiyat belirlemenizi sağlar.`
-                        : "Fiyat şablonunu bir menü şablonuna bağlarsanız, sadece o menüdeki ürünler için fiyat belirleyebilirsiniz. Bu sayede daha kontrollü fiyatlandırma yapabilirsiniz."
-                      }
-                    </p>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                )}
 
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={() => setShowPriceProductsModal(false)}
-                      className="px-4 py-2 text-white rounded-lg"
-                      style={{ backgroundColor: theme.primary }}
-                    >
-                      Kapat
-                    </button>
-                  </div>
+                {/* Bilgi Notu */}
+                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                  <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
+                    <FiInfo size={16} />
+                    <span>Fiyat Şablonu Hakkında</span>
+                  </h4>
+                  <p className="text-sm text-amber-600">
+                    {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id
+                      ? `Bu fiyat şablonu, seçili "${getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)}" menü şablonundaki ürünler için fiyat belirlemenizi sağlar.`
+                      : "Fiyat şablonunu bir menü şablonuna bağlarsanız, sadece o menüdeki ürünler için fiyat belirleyebilirsiniz. Bu sayede daha kontrollü fiyatlandırma yapabilirsiniz."
+                    }
+                  </p>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowPriceProductsModal(false)}
+                    className="px-4 py-2 text-white rounded-lg"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Kapat
+                  </button>
                 </div>
               </div>
             </div>
@@ -2909,62 +2980,161 @@ const EnhancedTemplateManager = () => {
               {/* Adım 1: Kopyalama Bilgileri ve İsim Belirleme */}
               {copyStep === 0 && (
                 <div className="p-6">
-                  {/* Kopyalanacak şablonun bilgileri */}
+                  {/* Kopyalanacak şablonun detaylı bilgileri */}
                   <div className="mb-6 bg-[#F4F7F8] p-4 rounded-lg">
                     <h4 className="font-medium text-[#022B45] mb-2">Kopyalanacak Şablon</h4>
                     <p className="text-[#495057] font-bold">{copyingTemplate.name}</p>
 
                     {copyDetails && (
                       <div className="mt-3 text-sm text-[#495057]">
-                        {copyDetails.items > 0 && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
-                              <path d="M9,10V12H7V10H9M13,10V12H11V10H13M17,10V12H15V10H17M19,3A2,2 0 0,1 21,5V19A2,2 0 0,1 19,21H5C3.89,21 3,20.1 3,19V5A2,2 0 0,1 5,3H6V1H8V3H16V1H18V3H19M19,19V8H5V19H19M9,14V16H7V14H9M13,14V16H11V14H13M17,14V16H15V14H17Z" />
-                            </svg>
-                            <span>{copyDetails.items} ürün</span>
-                          </div>
+                        {/* Detaylı istatistikler */}
+                        {copyingTemplate.type === templateTypes.MENU && (
+                          <>
+                            <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                  <path d="M9,10V12H7V10H9M13,10V12H11V10H13M17,10V12H15V10H17M19,3A2,2 0 0,1 21,5V19A2,2 0 0,1 19,21H5C3.89,21 3,20.1 3,19V5A2,2 0 0,1 5,3H6V1H8V3H16V1H18V3H19M19,19V8H5V19H19M9,14V16H7V14H9M13,14V16H11V14H13M17,14V16H15V14H17Z" />
+                                </svg>
+                                <span className="text-gray-600">Toplam Ürün</span>
+                              </div>
+                              <span className="font-medium">{copyDetails.items}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                              <span className="text-gray-600">Görünür Ürün</span>
+                              <span className="font-medium">{copyDetails.visibleItems} / {copyDetails.items}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                  <path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" />
+                                </svg>
+                                <span className="text-gray-600">Kategori Sayısı</span>
+                              </div>
+                              <span className="font-medium">{copyDetails.categories?.size || 0}</span>
+                            </div>
+
+                            {copyDetails.topCategories?.length > 0 && (
+                              <div className="mt-2">
+                                <span className="text-gray-600 text-xs">En çok ürün bulunan kategoriler:</span>
+                                <div className="mt-1 space-y-1">
+                                  {copyDetails.topCategories.map(cat => (
+                                    <div key={cat.name} className="flex items-center justify-between text-xs">
+                                      <span>{cat.name}</span>
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{cat.count} ürün</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
 
-                        {copyDetails.categories?.size > 0 && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
-                              <path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z" />
-                            </svg>
-                            <span>{copyDetails.categories.size} kategori</span>
-                          </div>
+                        {copyingTemplate.type === templateTypes.PRICE && (
+                          <>
+                            <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                  <path d="M9,10V12H7V10H9M13,10V12H11V10H13M17,10V12H15V10H17M19,3A2,2 0 0,1 21,5V19A2,2 0 0,1 19,21H5C3.89,21 3,20.1 3,19V5A2,2 0 0,1 5,3H6V1H8V3H16V1H18V3H19M19,19V8H5V19H19M9,14V16H7V14H9M13,14V16H11V14H13M17,14V16H15V14H17Z" />
+                                </svg>
+                                <span className="text-gray-600">Toplam Ürün</span>
+                              </div>
+                              <span className="font-medium">{copyDetails.items}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                  <path d="M7,15H9C9,16.08 10.37,17 12,17C13.63,17 15,16.08 15,15C15,13.9 13.96,13.5 11.76,12.97C9.64,12.44 7,11.78 7,9C7,7.21 8.47,5.69 10.5,5.18V3H13.5V5.18C15.53,5.69 17,7.21 17,9H15C15,7.92 13.63,7 12,7C10.37,7 9,7.92 9,9C9,10.1 10.04,10.5 12.24,11.03C14.36,11.56 17,12.22 17,15C17,16.79 15.53,18.31 13.5,18.82V21H10.5V18.82C8.47,18.31 7,16.79 7,15Z" />
+                                </svg>
+                                <span className="text-gray-600">Özel Fiyatlı Ürün</span>
+                              </div>
+                              <span className="font-medium">{copyDetails.customPrices} / {copyDetails.items}</span>
+                            </div>
+
+                            {copyDetails.priceChanges && (
+                              <div className="mt-2 space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">Fiyatı Artırılan:</span>
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                    {copyDetails.priceChanges.increased} ürün
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-600">Fiyatı Azaltılan:</span>
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                    {copyDetails.priceChanges.decreased} ürün
+                                  </span>
+                                </div>
+
+                                {copyDetails.avgPriceChange && (
+                                  <div className="flex items-center justify-between text-xs mt-1">
+                                    <span className="text-gray-600">Ortalama Fiyat Değişimi:</span>
+                                    <span className={`px-2 py-0.5 rounded-full ${copyDetails.avgPriceChange > 0
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-green-100 text-green-700'
+                                      }`}>
+                                      {copyDetails.avgPriceChange > 0 ? '+' : ''}
+                                      {copyDetails.avgPriceChange.toFixed(2)} ₺
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {copyDetails.linkedMenu && (
+                              <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
+                                <div className="flex items-center text-sm text-blue-700">
+                                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D] mr-1" fill="currentColor">
+                                    <path d="M3.9,12C3.9,10.29 5.29,8.9 7,8.9H11V7H7A5,5 0 0,0 2,12A5,5 0 0,0 7,17H11V15.1H7C5.29,15.1 3.9,13.71 3.9,12M8,13H16V11H8V13M17,7H13V8.9H17C18.71,8.9 20.1,10.29 20.1,12C20.1,13.71 18.71,15.1 17,15.1H13V17H17A5,5 0 0,0 22,12A5,5 0 0,0 17,7Z" />
+                                  </svg>
+                                  <span>Bağlı menü: {copyDetails.linkedMenu}</span>
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
 
-                        {copyDetails.customPrices > 0 && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
-                              <path d="M7,15H9C9,16.08 10.37,17 12,17C13.63,17 15,16.08 15,15C15,13.9 13.96,13.5 11.76,12.97C9.64,12.44 7,11.78 7,9C7,7.21 8.47,5.69 10.5,5.18V3H13.5V5.18C15.53,5.69 17,7.21 17,9H15C15,7.92 13.63,7 12,7C10.37,7 9,7.92 9,9C9,10.1 10.04,10.5 12.24,11.03C14.36,11.56 17,12.22 17,15C17,16.79 15.53,18.31 13.5,18.82V21H10.5V18.82C8.47,18.31 7,16.79 7,15Z" />
-                            </svg>
-                            <span>{copyDetails.customPrices} özel fiyat</span>
-                          </div>
+                        {copyingTemplate.type === templateTypes.INTEGRATION && (
+                          <>
+                            {copyDetails.items > 0 && (
+                              <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                    <path d="M9,10V12H7V10H9M13,10V12H11V10H13M17,10V12H15V10H17M19,3A2,2 0 0,1 21,5V19A2,2 0 0,1 19,21H5C3.89,21 3,20.1 3,19V5A2,2 0 0,1 5,3H6V1H8V3H16V1H18V3H19M19,19V8H5V19H19M9,14V16H7V14H9M13,14V16H11V14H13M17,14V16H15V14H17Z" />
+                                  </svg>
+                                  <span className="text-gray-600">Toplam Ürün</span>
+                                </div>
+                                <span className="font-medium">{copyDetails.items}</span>
+                              </div>
+                            )}
+
+                            {copyDetails.integrationType && (
+                              <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
+                                    <path d="M12,3C7.58,3 4,4.79 4,7V17C4,19.21 7.59,21 12,21C16.41,21 20,19.21 20,17V7C20,4.79 16.42,3 12,3M18,17C18,17.5 15.87,19 12,19C8.13,19 6,17.5 6,17V14.77C7.61,15.55 9.72,16 12,16C14.28,16 16.39,15.55 18,14.77V17M18,12.45C16.7,13.4 14.42,14 12,14C9.58,14 7.3,13.4 6,12.45V9.64C7.47,10.47 9.61,11 12,11C14.39,11 16.53,10.47 18,9.64V12.45M12,9C8.13,9 6,7.5 6,7C6,6.5 8.13,5 12,5C15.87,5 18,6.5 18,7C18,7.5 15.87,9 12,9Z" />
+                                  </svg>
+                                  <span className="text-gray-600">Entegrasyon tipi:</span>
+                                </div>
+                                <span className="font-medium">
+                                  {copyDetails.integrationType === 'delivery' && 'Teslimat'}
+                                  {copyDetails.integrationType === 'payment' && 'Ödeme'}
+                                  {copyDetails.integrationType === 'order' && 'Sipariş'}
+                                  {copyDetails.integrationType === 'menu' && 'Menü'}
+                                  {copyDetails.integrationType === 'other' && 'Diğer'}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
 
-                        {copyDetails.linkedMenu && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
-                              <path d="M3.9,12C3.9,10.29 5.29,8.9 7,8.9H11V7H7A5,5 0 0,0 2,12A5,5 0 0,0 7,17H11V15.1H7C5.29,15.1 3.9,13.71 3.9,12M8,13H16V11H8V13M17,7H13V8.9H17C18.71,8.9 20.1,10.29 20.1,12C20.1,13.71 18.71,15.1 17,15.1H13V17H17A5,5 0 0,0 22,12A5,5 0 0,0 17,7Z" />
-                            </svg>
-                            <span>Bağlı menü: {copyDetails.linkedMenu}</span>
-                          </div>
-                        )}
-
-                        {copyDetails.integrationType && (
-                          <div className="flex items-center gap-2 mb-1">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
-                              <path d="M12,3C7.58,3 4,4.79 4,7V17C4,19.21 7.59,21 12,21C16.41,21 20,19.21 20,17V7C20,4.79 16.42,3 12,3M18,17C18,17.5 15.87,19 12,19C8.13,19 6,17.5 6,17V14.77C7.61,15.55 9.72,16 12,16C14.28,16 16.39,15.55 18,14.77V17M18,12.45C16.7,13.4 14.42,14 12,14C9.58,14 7.3,13.4 6,12.45V9.64C7.47,10.47 9.61,11 12,11C14.39,11 16.53,10.47 18,9.64V12.45M12,9C8.13,9 6,7.5 6,7C6,6.5 8.13,5 12,5C15.87,5 18,6.5 18,7C18,7.5 15.87,9 12,9Z" />
-                            </svg>
-                            <span>
-                              Entegrasyon tipi:
-                              {copyDetails.integrationType === 'delivery' && ' Teslimat'}
-                              {copyDetails.integrationType === 'payment' && ' Ödeme'}
-                              {copyDetails.integrationType === 'order' && ' Sipariş'}
-                              {copyDetails.integrationType === 'menu' && ' Menü'}
-                              {copyDetails.integrationType === 'other' && ' Diğer'}
-                            </span>
+                        {/* Son güncelleme bilgisi */}
+                        {copyDetails.lastUpdated && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            Son güncelleme: {formatDate(copyDetails.lastUpdated)}
                           </div>
                         )}
                       </div>
@@ -3169,57 +3339,141 @@ const EnhancedTemplateManager = () => {
                     </p>
                   </div>
 
-                  <div className="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCopyingTemplate(null);
-                        setCopyStep(0);
-                        fetchTemplates(); // Şablonları yenile
-                      }}
-                      className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                      style={{
-                        borderColor: theme.secondary,
-                        color: theme.primary,
-                        fontWeight: 600
-                      }}
-                    >
-                      Kapat
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Yeni oluşturulan şablonu düzenleme modunda aç
-                        const newTemplateType = copyingTemplate.type;
-                        setCopyingTemplate(null);
-                        setCopyStep(0);
+                  {/* Kopyalama sonrası hızlı erişim seçenekleri */}
+                  {newTemplateInfo && (
+                    <div className="grid grid-cols-1 gap-3 mt-6">
+                      <button
+                        onClick={() => {
+                          const handleEditNewTemplate = async () => {
+                            setCopyingTemplate(null);
+                            setCopyStep(0);
+                            setCopyResults(null);
 
-                        // API'den yeni şablonu bul ve düzenleme modalını aç
-                        fetchTemplates().then(() => {
-                          // Son eklenen şablonu bul
-                          setTimeout(() => {
-                            const newTemplate = templates[newTemplateType].find(t => t.name === copyName);
-                            if (newTemplate) {
-                              handleAddEditTemplate(newTemplate, newTemplateType);
+                            try {
+                              await fetchTemplates();
+
+                              setTimeout(() => {
+                                const newTemplate = templates[newTemplateInfo.type].find(
+                                  t => t.id === newTemplateInfo.id || t.name === newTemplateInfo.name
+                                );
+
+                                if (newTemplate) {
+                                  handleAddEditTemplate(newTemplate, newTemplateInfo.type);
+                                } else {
+                                  toast.error("Yeni şablon bulunamadı. Lütfen şablonlar listesinden manuel olarak seçin.");
+                                }
+                              }, 300);
+                            } catch (error) {
+                              console.error("Şablon düzenleme açılırken hata:", error);
+                              toast.error("Şablon düzenleme açılamadı");
                             }
-                          }, 300);
-                        });
-                      }}
-                      className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors flex items-center gap-2"
-                      style={{
-                        backgroundColor: theme.primary,
-                        fontWeight: 600
-                      }}
-                    >
-                      <FiEdit2 size={16} />
-                      <span>Yeni Şablonu Düzenle</span>
-                    </button>
-                  </div>
+                          };
+
+                          handleEditNewTemplate();
+                        }}
+                        className="w-full py-2.5 text-white rounded-lg hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                        style={{
+                          backgroundColor: theme.primary,
+                          fontWeight: 600
+                        }}
+                      >
+                        <FiEdit2 size={16} />
+                        <span>Yeni Şablonu Düzenle</span>
+                      </button>
+
+                      {copyingTemplate.type === templateTypes.MENU && (
+                        <button
+                          onClick={() => {
+                            const handleManageNewTemplateProducts = async () => {
+                              setCopyingTemplate(null);
+                              setCopyStep(0);
+                              setCopyResults(null);
+
+                              try {
+                                await fetchTemplates();
+
+                                setTimeout(() => {
+                                  const newTemplate = templates.menu.find(
+                                    t => t.id === newTemplateInfo.id || t.name === newTemplateInfo.name
+                                  );
+
+                                  if (newTemplate) {
+                                    handleManageMenuProducts(newTemplate.id);
+                                  } else {
+                                    toast.error("Yeni şablon bulunamadı");
+                                  }
+                                }, 300);
+                              } catch (error) {
+                                console.error("Şablon ürünleri açılırken hata:", error);
+                                toast.error("Şablon ürünleri açılamadı");
+                              }
+                            };
+
+                            handleManageNewTemplateProducts();
+                          }}
+                          className="w-full py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <FiPackage size={16} />
+                          <span>Yeni Şablonun Ürünlerini Yönet</span>
+                        </button>
+                      )}
+
+                      {copyingTemplate.type === templateTypes.PRICE && (
+                        <button
+                          onClick={() => {
+                            const handleManageNewTemplatePrices = async () => {
+                              setCopyingTemplate(null);
+                              setCopyStep(0);
+                              setCopyResults(null);
+
+                              try {
+                                await fetchTemplates();
+
+                                setTimeout(() => {
+                                  const newTemplate = templates.price.find(
+                                    t => t.id === newTemplateInfo.id || t.name === newTemplateInfo.name
+                                  );
+
+                                  if (newTemplate) {
+                                    handleManagePriceProducts(newTemplate.id);
+                                  } else {
+                                    toast.error("Yeni şablon bulunamadı");
+                                  }
+                                }, 300);
+                              } catch (error) {
+                                console.error("Şablon fiyatları açılırken hata:", error);
+                                toast.error("Şablon fiyatları açılamadı");
+                              }
+                            };
+
+                            handleManageNewTemplatePrices();
+                          }}
+                          className="w-full py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <FiSettings size={16} />
+                          <span>Yeni Şablonun Fiyatlarını Yönet</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setCopyingTemplate(null);
+                          setCopyStep(0);
+                          setCopyResults(null);
+                          fetchTemplates();
+                        }}
+                        className="w-full py-2 text-gray-600 hover:text-gray-800 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span>Kapat</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
-        
+
         <div className="bg-blue-50 p-4 rounded-lg mt-6 border border-blue-100">
           <div className="flex gap-3">
             <div className="bg-blue-100 p-2 rounded-full">
@@ -3242,13 +3496,13 @@ const EnhancedTemplateManager = () => {
         {/* Çeşme Kahvecisi font ailesi için */}
         <style>
           {`
-            @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
-            
-            /* Menu Card Shadow Text class */
-            .shadow-text {
-              text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-            }
-          `}
+           @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+           
+           /* Menu Card Shadow Text class */
+           .shadow-text {
+             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+           }
+         `}
         </style>
       </div>
     </div>
