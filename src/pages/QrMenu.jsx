@@ -3,9 +3,11 @@ import { useNavigate, useLocation, useParams } from "react-router-dom"
 import api from "../lib/axios"
 import toast from "react-hot-toast"
 import CesmeHeader from "../components/CesmeHeader"
+import CustomerLogin from "../components/CustomerLogin"
+import LoyaltyProfile from "../components/LoyaltyProfile"
 
 const QrMenu = () => {
-  const { branchId } = useParams() // URL'den şube ID'sini alıyoruz
+  const { branchId } = useParams()
   const [products, setProducts] = useState([])
   const [activeCategory, setActiveCategory] = useState(null)
   const [cart, setCart] = useState([])
@@ -28,6 +30,19 @@ const QrMenu = () => {
   const [sliderContainerHeight, setSliderContainerHeight] = useState(0)
   const sliderContainerRef = useRef(null)
 
+  // Sadakat sistemi için yeni state'ler
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [customer, setCustomer] = useState(null)
+  const [showLoyaltyProfile, setShowLoyaltyProfile] = useState(false)
+
+  // Sayfa yüklendiğinde müşteri kontrolü
+  useEffect(() => {
+    const savedCustomer = localStorage.getItem('customer_data')
+    if (savedCustomer) {
+      setCustomer(JSON.parse(savedCustomer))
+    }
+  }, [])
+
   // Promosyon slider verileri
   const promotionSlides = [
     {
@@ -38,7 +53,6 @@ const QrMenu = () => {
       id: 2,
       image: "/uploads/dere-otlu-pogaca-slider.png"
     }
-    // Buraya daha fazla promosyon eklenebilir
   ]
 
   // Slider boyutlarını hesapla
@@ -50,10 +64,7 @@ const QrMenu = () => {
       setSliderContainerHeight(calculatedHeight);
     }
 
-    // İlk yüklemede hesapla
     calculateSliderHeight();
-
-    // Pencere boyutu değiştiğinde tekrar hesapla
     window.addEventListener('resize', calculateSliderHeight);
 
     return () => {
@@ -61,21 +72,18 @@ const QrMenu = () => {
     }
   }, []);
 
-  /// Scroll pozisyonunu izle
+  // Scroll pozisyonunu izle
   useEffect(() => {
     const handleScroll = () => {
-      // Belli bir mesafe scroll edildiğinde header'ı gizle
       if (window.scrollY > 50) {
         setShowHeader(false);
       } else {
         setShowHeader(true);
       }
 
-      // Kategori başlığının y-pozisyonuna göre sabit başlığı göster/gizle
       const categorySection = document.getElementById('categories-section')
       if (categorySection) {
         const categorySectionTop = categorySection.getBoundingClientRect().top
-        // Kategori bölümü görünümden çıktığında sabit kategori başlığını göster
         setShowCategoryHeader(categorySectionTop <= 0)
       }
     }
@@ -86,26 +94,22 @@ const QrMenu = () => {
 
   // Görünen kategoriyi otomatik aktif etmek için IntersectionObserver
   useEffect(() => {
-    // Daha önce oluşturulan observer'ı temizle
     if (categoryObserverRef.current) {
       categoryObserverRef.current.disconnect()
     }
 
-    // Yeni observer oluştur
     const options = {
       root: null,
-      rootMargin: "-20% 0px -70% 0px", // Ekranın orta kısmında görünen kategoriler için
+      rootMargin: "-20% 0px -70% 0px",
       threshold: 0.1
     }
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          // Kategori ID'sinden kategori adını çıkar (section-Çaylar -> Çaylar)
           const categoryName = entry.target.id.replace('section-', '')
           setActiveCategory(categoryName)
 
-          // Aktif kategori değiştiğinde yatay scroll'u güncelle
           if (showCategoryHeader) {
             setTimeout(() => {
               const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
@@ -122,7 +126,6 @@ const QrMenu = () => {
       })
     }, options)
 
-    // Tüm kategori bölümlerini gözlemle
     Object.keys(groupedWithTeaFirst).forEach(category => {
       const element = document.getElementById(`section-${category}`)
       if (element) {
@@ -137,7 +140,7 @@ const QrMenu = () => {
         categoryObserverRef.current.disconnect()
       }
     }
-  }, [products, showCategoryHeader]) // products veya showCategoryHeader değiştiğinde observer'ı yeniden oluştur
+  }, [products, showCategoryHeader])
 
   // Slider otomatik geçiş
   useEffect(() => {
@@ -161,20 +164,16 @@ const QrMenu = () => {
     if (!branch_id) {
       console.log("Şube ID'si belirtilmedi, varsayılan şube ürünleri getiriliyor");
       try {
-        // Şube ID'si belirtilmemişse tüm şubeleri getir ve ilk şubeyi kullan
         const branchesResponse = await api.get("/api/branches");
         if (branchesResponse.data && branchesResponse.data.length > 0) {
           const defaultBranchId = branchesResponse.data[0].id;
           console.log(`Varsayılan şube ID'si: ${defaultBranchId}`);
 
-          // Varsayılan şube bilgilerini getir (menü/şablon bazlı)
           const branchResponse = await api.get(`/api/branches/${defaultBranchId}`);
           const defaultBranch = branchResponse.data;
 
-          // Varsayılan şubenin menüsünü getir
           const productsResponse = await api.get(`/api/branches/${defaultBranchId}/menu`);
 
-          // API yanıtını detaylı logla
           console.log("API yanıtı:", productsResponse.data);
 
           if (productsResponse.data && productsResponse.data.products) {
@@ -190,7 +189,6 @@ const QrMenu = () => {
             loadFallbackProducts();
           }
 
-          // URL'i güncelle (sayfa yenilenmez)
           navigate(`/menu/${defaultBranchId}`, { replace: true });
         }
       } catch (err) {
@@ -203,12 +201,10 @@ const QrMenu = () => {
     try {
       console.log(`${branch_id} ID'li şubenin menüsü getiriliyor...`);
 
-      // Şube bilgilerini al (şablon ID'leri, vs.)
       const branchResponse = await api.get(`/api/branches/${branch_id}`);
       const branch = branchResponse.data;
       console.log("Şube detayları:", branch);
 
-      // Şubenin menüsünü getir
       const response = await api.get(`/api/branches/${branch_id}/menu`);
       console.log("Menü API yanıtı:", response.data);
 
@@ -217,7 +213,6 @@ const QrMenu = () => {
         setProducts(response.data.products);
       } else {
         console.warn("Şube için ürün bulunamadı veya API yanıtı beklenen formatta değil:", response.data);
-        // Ürün bulunamama nedenini kontrol et
         if (branch.menu_template_id && branch.price_template_id) {
           console.warn(`Şablonlar doğru: Menü Şablonu=${branch.menu_template_id}, Fiyat Şablonu=${branch.price_template_id}`);
           console.warn("Ancak bu şablonlarda görünür ürün yok veya API yanıtı beklenen formatta değil");
@@ -236,7 +231,6 @@ const QrMenu = () => {
   const loadFallbackProducts = () => {
     setProducts([]);
 
-    // API bağlantısı yoksa örnek veri göster
     if (process.env.NODE_ENV !== 'production') {
       console.log("Örnek ürün verileri yükleniyor...");
       setProducts([
@@ -294,13 +288,11 @@ const QrMenu = () => {
         });
       }
 
-      // Yatay scroll ile kategori butonunu görünür yap
       setTimeout(() => {
         const fixedCatButton = document.getElementById(`fixed-cat-${categoryName}`)
         const fixedNavContainer = document.getElementById('fixed-category-nav')
 
         if (fixedCatButton && fixedNavContainer) {
-          // Butonu görünür alana getir
           fixedCatButton.scrollIntoView({
             behavior: "smooth",
             block: "nearest",
@@ -321,7 +313,7 @@ const QrMenu = () => {
           ? { ...item, quantity: item.quantity + 1 }
           : item
       )
-      : [...existingCart, { ...product, quantity: 1, branch_id: branchId }] // Sepete eklenen ürüne şube ID'sini de ekle
+      : [...existingCart, { ...product, quantity: 1, branch_id: branchId }]
 
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart))
     setCart(updatedCart)
@@ -362,7 +354,6 @@ const QrMenu = () => {
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
 
-    // Clarity sepet güncelleme izleme
     if (window.clarity) {
       const product = cart.find(item => item.id === productId);
       window.clarity("event", delta > 0 ? "cart_increase" : "cart_decrease", {
@@ -380,7 +371,6 @@ const QrMenu = () => {
     setCart(updatedCart);
     localStorage.setItem("qr_cart", JSON.stringify(updatedCart));
 
-    // Clarity sepetten ürün çıkarma izleme
     if (window.clarity && product) {
       window.clarity("event", "remove_from_cart", {
         productId: productId,
@@ -400,7 +390,6 @@ const QrMenu = () => {
   }
 
   const clearCart = () => {
-    // Clarity sepet temizleme izleme
     if (window.clarity && cart.length > 0) {
       window.clarity("event", "clear_cart", {
         itemCount: cart.length,
@@ -431,7 +420,6 @@ const QrMenu = () => {
       .replace(/ü/g, "u")
       .replace(/\s+/g, "-") || "default"
 
-  // Önerilen ürünleri filtrele
   const recommendedProducts = products.filter((p) =>
     ["Çeşme Kumru", "Beyaz Peynirli Omlet"].includes(p.name)
   )
@@ -442,14 +430,12 @@ const QrMenu = () => {
       setCart(stored)
     }
 
-    // Sync cart when the window gains focus or component mounts
     window.addEventListener("focus", syncCart)
     syncCart()
 
     return () => window.removeEventListener("focus", syncCart)
   }, [])
 
-  // Resimlerin yüklendiğini kontrol etmek için
   const handleImageLoad = (e) => {
     if (sliderContainerRef.current && e.target.naturalWidth) {
       const containerWidth = sliderContainerRef.current.offsetWidth;
@@ -459,15 +445,10 @@ const QrMenu = () => {
   }
 
   const handleProductClick = (product) => {
-    // Ürün detay sayfasına yönlendir
     navigate(`/product/${product.id}`, { state: { product, branchId } });
 
-    // Clarity olay izleme - ürün görüntüleme
     if (window.clarity) {
-      // Ürün adını kullanıcı özelliği olarak ayarla
       window.clarity("set", "product_viewed", product.name);
-
-      // Özel ürün tıklama olayı
       window.clarity("event", "product_click", {
         productId: product.id,
         productName: product.name,
@@ -478,40 +459,79 @@ const QrMenu = () => {
     }
   };
 
-
-  useEffect(() => {
-    const fetchBranchMenu = async (branch_id) => {
-      // ...
-      try {
-        // Şube bilgilerini şablon bilgileriyle birlikte al
-        const branchResponse = await api.get(`/api/branches/${branch_id}`);
-        const branch = branchResponse.data;
-
-        // Şube şablonlarına göre ürünleri ve fiyatları getir
-        const productsResponse = await api.get(`/api/branches/${branch_id}/products`, {
-          params: {
-            menu_template_id: branch.menu_template_id,
-            price_template_id: branch.price_template_id
-          }
-        });
-
-        setProducts(productsResponse.data);
-      } catch (err) {
-        // Hata yönetimi
+  // Sipariş tamamlandığında puan kazanma
+  const handleCompleteOrder = async () => {
+    try {
+      const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      
+      // Siparişi kaydet
+      const orderData = {
+        items: cart,
+        total_price: totalPrice,
+        branch_id: branchId,
+        customer_profile_id: customer?.id || null
       }
-    };
-  }, [branchId]);
+
+      const orderResponse = await api.post('/api/orders', orderData)
+
+      // Eğer müşteri giriş yapmışsa puan kazan
+      if (customer && orderResponse.data.id) {
+        try {
+          const pointsResponse = await api.post('/api/loyalty/earn-points', {
+            order_id: orderResponse.data.id
+          })
+
+          toast.success(
+            `Tebrikler! ${pointsResponse.data.points_earned} puan kazandınız!`,
+            { duration: 5000 }
+          )
+        } catch (err) {
+          console.error('Puan kazanma hatası:', err)
+        }
+      }
+
+      // Sepeti temizle ve onay sayfasına yönlendir
+      clearCart()
+      navigate('/confirm', { state: { orderId: orderResponse.data.id } })
+    } catch (err) {
+      console.error('Sipariş tamamlama hatası:', err)
+      toast.error('Sipariş tamamlanamadı. Lütfen tekrar deneyin.')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
       <div
-        className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'
-          }`}
+        className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
       >
         <CesmeHeader />
       </div>
 
-      {/* Sabit Kategori Header (scroll edildiğinde görünür) */}
+      {/* Müşteri Header */}
+      <div className="fixed top-4 right-4 z-50">
+        {customer ? (
+          <button
+            onClick={() => setShowLoyaltyProfile(true)}
+            className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
+          >
+            <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
+              {customer.full_name?.charAt(0) || customer.phone_number.charAt(0)}
+            </div>
+            <span className="font-medium">
+              {customer.full_name || customer.phone_number}
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 transition"
+          >
+            Giriş Yap / Puan Kazan
+          </button>
+        )}
+      </div>
+
+      {/* Sabit Kategori Header */}
       {showCategoryHeader && (
         <div className="sticky top-0 z-40 bg-white shadow-md transition-all duration-300">
           <div className="overflow-x-auto px-0">
@@ -522,7 +542,7 @@ const QrMenu = () => {
                   key={cat}
                   onClick={() => handleCategoryClick(cat)}
                   className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
-            ${activeCategory === cat
+                    ${activeCategory === cat
                       ? 'bg-white border-white text-[#022B45]'
                       : 'bg-[#022B45] text-white border-[#022B45] hover:opacity-90'
                     }`}
@@ -533,7 +553,6 @@ const QrMenu = () => {
             </div>
           </div>
 
-          {/* Aktif kategori göstergesi */}
           {activeCategory && (
             <div className="bg-[#f4e9c7] py-1 px-4 text-[#d49e36] border-t border-[#e3d5a8] text-sm font-medium">
               Şu an görüntülenen: {activeCategory}
@@ -599,8 +618,7 @@ const QrMenu = () => {
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-white w-4' : 'bg-white/50'
-                    }`}
+                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-white w-4' : 'bg-white/50'}`}
                   aria-label={`Slayt ${index + 1}`}
                 />
               ))}
@@ -673,8 +691,7 @@ const QrMenu = () => {
                 onClick={() => handleCategoryClick(cat)}
                 className="snap-start flex flex-col items-center cursor-pointer"
               >
-                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-white" : ""
-                  }`}>
+                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-white" : ""}`}>
                   <img
                     src={`/category/${toSlug(cat)}.jpg`}
                     alt={cat}
@@ -710,7 +727,6 @@ const QrMenu = () => {
                     onClick={() => handleProductClick(p)}
                     className="w-full bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition cursor-pointer relative group"
                   >
-                    {/* Ürün Görseli - Şimdi solda */}
                     <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md relative transition-all duration-300 group-hover:scale-105">
                       <img
                         src={
@@ -736,7 +752,6 @@ const QrMenu = () => {
                       </button>
                     </div>
 
-                    {/* Ürün Detayları - Şimdi sağda */}
                     <div className="flex-1 pl-2 group-hover:transform group-hover:translate-y-[-2px] transition-transform duration-300">
                       <h3 className="text-base font-semibold mb-1">{p.name}</h3>
                       <p className="text-[#D98A3D] font-bold text-base mb-1">{p.price} ₺</p>
@@ -745,7 +760,6 @@ const QrMenu = () => {
                         <p className="text-sm text-gray-600 line-clamp-2 mb-2">{p.description}</p>
                       )}
 
-                      {/* Ürün özellikleri ikonları */}
                       <div className="flex gap-2 mt-2">
                         {p.isGlutenFree && (
                           <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
@@ -790,7 +804,6 @@ const QrMenu = () => {
                 className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#B8D7DD] focus:border-[#B8D7DD]"
               />
 
-              {/* Stokta olanları göster */}
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -804,7 +817,6 @@ const QrMenu = () => {
                 </label>
               </div>
 
-              {/* Fiyat aralığı filtrelemesi */}
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -822,7 +834,6 @@ const QrMenu = () => {
                 />
               </div>
 
-              {/* Kategori bazlı filtreleme */}
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -931,16 +942,7 @@ const QrMenu = () => {
                 <div className="flex flex-col gap-2 mt-6">
                   <button
                     className="w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors"
-                    onClick={() => {
-                      const currentCart = [...cart];
-                      navigate("/confirm", {
-                        state: {
-                          cart: currentCart,
-                          branchId: branchId
-                        },
-                        search: location.search
-                      });
-                    }}
+                    onClick={handleCompleteOrder}
                   >
                     Siparişi Tamamla
                   </button>
@@ -953,6 +955,46 @@ const QrMenu = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <CustomerLogin
+          onSuccess={(customerData) => {
+            setCustomer(customerData);
+            setShowLoginModal(false);
+          }}
+          onClose={() => setShowLoginModal(false)}
+        />
+      )}
+
+      {/* Sadakat Profili Modal */}
+      {showLoyaltyProfile && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+            <button
+              onClick={() => setShowLoyaltyProfile(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+            
+            <h2 className="text-xl font-bold mb-4">Sadakat Kartlarım</h2>
+            <LoyaltyProfile customer={customer} />
+            
+            <button
+              onClick={() => {
+                localStorage.removeItem('customer_token');
+                localStorage.removeItem('customer_data');
+                setCustomer(null);
+                setShowLoyaltyProfile(false);
+              }}
+              className="w-full mt-4 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+            >
+              Çıkış Yap
+            </button>
           </div>
         </div>
       )}
