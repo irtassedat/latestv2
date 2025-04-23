@@ -1,3 +1,4 @@
+// src/pages/QrMenu.jsx
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useLocation, useParams } from "react-router-dom"
 import api from "../lib/axios"
@@ -504,31 +505,16 @@ const QrMenu = () => {
       <div
         className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
       >
-        <CesmeHeader />
-      </div>
-
-      {/* Müşteri Header */}
-      <div className="fixed top-4 right-4 z-50">
-        {customer ? (
-          <button
-            onClick={() => setShowLoyaltyProfile(true)}
-            className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
-          >
-            <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
-              {customer.full_name?.charAt(0) || customer.phone_number.charAt(0)}
-            </div>
-            <span className="font-medium">
-              {customer.full_name || customer.phone_number}
-            </span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 transition"
-          >
-            Giriş Yap / Puan Kazan
-          </button>
-        )}
+        <CesmeHeader 
+          customer={customer}
+          onLoginClick={() => setShowLoginModal(true)}
+          onProfileClick={() => setShowLoyaltyProfile(true)}
+          onLogout={() => {
+            localStorage.removeItem('customer_token');
+            localStorage.removeItem('customer_data');
+            setCustomer(null);
+          }}
+        />
       </div>
 
       {/* Sabit Kategori Header */}
