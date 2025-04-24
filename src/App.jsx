@@ -27,6 +27,8 @@ import CustomerLoyaltyManager from "./components/CustomerLoyaltyManager";
 import LoyaltySettingsManager from "./components/LoyaltySettingsManager";
 import LoyaltyReportsManager from "./components/LoyaltyReportsManager";
 import ManualPointTransaction from "./components/ManualPointTransaction";
+import BranchPointsTransfer from "./components/BranchPointsTransfer";
+
 
 function App() {
   return (
@@ -82,6 +84,7 @@ function App() {
                 <Route path="/admin/loyalty/points/manual" element={<ManualPointTransaction />} />
                 <Route path="/admin/loyalty/reports" element={<LoyaltyReportsManager />} />
                 <Route path="/admin/loyalty/settings" element={<LoyaltySettingsManager />} />
+                <Route path="/admin/loyalty/branch-transfer" element={<BranchPointsTransfer />} />
 
               </Route>
             </Route>

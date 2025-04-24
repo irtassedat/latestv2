@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiStar, FiGift, FiUsers, FiSettings, FiTrendingUp,
-  FiAward, FiActivity, FiCreditCard, FiBarChart2
+  FiAward, FiActivity, FiCreditCard, FiBarChart2, FiArrowRightLeft
 } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../lib/axios";
@@ -309,6 +309,17 @@ const LoyaltyProgramManager = () => {
               <div className="text-left">
                 <p className="font-medium">Manuel Puan İşlemi</p>
                 <p className="text-sm">Puan ekle/çıkar</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => navigate('/admin/loyalty/branch-transfer')}
+              className="flex items-center gap-3 p-4 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100"
+            >
+              <FiArrowRightLeft size={24} />
+              <div className="text-left">
+                <p className="font-medium">Şube Transferi</p>
+                <p className="text-sm">Puanları transfer et</p>
               </div>
             </button>
             
