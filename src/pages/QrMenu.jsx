@@ -502,7 +502,7 @@ const QrMenu = () => {
         items: cart,
         total_price: totalPrice,
         branch_id: branchId,
-        name: customer?.full_name || "",
+        name: customer?.full_name || customer?.phone_number || "Anonim",
         phone: customer?.phone_number || "",
         table_number: "1",
         customer_profile_id: customer?.id || null,
