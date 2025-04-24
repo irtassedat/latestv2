@@ -6,6 +6,7 @@ import toast from "react-hot-toast"
 import CesmeHeader from "../components/CesmeHeader"
 import CustomerLogin from "../components/CustomerLogin"
 import LoyaltyProfile from "../components/LoyaltyProfile"
+import LoyaltyPointsModal from "../components/LoyaltyPointsModal"
 
 const QrMenu = () => {
   const { branchId } = useParams()
@@ -35,14 +36,46 @@ const QrMenu = () => {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [customer, setCustomer] = useState(null)
   const [showLoyaltyProfile, setShowLoyaltyProfile] = useState(false)
+  const [loyaltyData, setLoyaltyData] = useState(null)
+  
+  // Puan kullanımı için yeni state'ler
+  const [showPointsModal, setShowPointsModal] = useState(false)
+  const [selectedPoints, setSelectedPoints] = useState(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
 
   // Sayfa yüklendiğinde müşteri kontrolü
   useEffect(() => {
     const savedCustomer = localStorage.getItem('customer_data')
     if (savedCustomer) {
       setCustomer(JSON.parse(savedCustomer))
+      fetchLoyaltyData(JSON.parse(savedCustomer).id)
     }
   }, [])
+
+  // Sadakat bilgilerini getir
+  const fetchLoyaltyData = async (customerId) => {
+    try {
+      const token = localStorage.getItem('customer_token')
+      const response = await api.get(`/api/loyalty/customer/${customerId}/data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setLoyaltyData(response.data)
+    } catch (err) {
+      console.error('Sadakat bilgileri alınamadı:', err)
+    }
+  }
+
+  // Puan seçildiğinde çalışacak fonksiyon
+  const handlePointsSelected = (pointsData) => {
+    setSelectedPoints(pointsData.points)
+    setDiscountAmount(pointsData.discount)
+  }
+
+  // İndirimli toplam tutarı hesaplama
+  const calculateDiscountedTotal = () => {
+    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    return subtotal - discountAmount
+  }
 
   // Promosyon slider verileri
   const promotionSlides = [
@@ -460,62 +493,147 @@ const QrMenu = () => {
     }
   };
 
-  // Sipariş tamamlandığında puan kazanma
+  // Sipariş tamamlama fonksiyonunu güncelle
   const handleCompleteOrder = async () => {
     try {
-      const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const totalPrice = calculateDiscountedTotal()
       
-      // Siparişi kaydet
       const orderData = {
         items: cart,
         total_price: totalPrice,
         branch_id: branchId,
-        customer_profile_id: customer?.id || null
+        name: customer?.full_name || "",
+        phone: customer?.phone_number || "",
+        table_number: "1",
+        customer_profile_id: customer?.id || null,
+        used_points: selectedPoints || 0,
+        discount_amount: discountAmount || 0
       }
 
       const orderResponse = await api.post('/api/orders', orderData)
 
-      // Eğer müşteri giriş yapmışsa puan kazan
-      if (customer && orderResponse.data.id) {
-        try {
-          const pointsResponse = await api.post('/api/loyalty/earn-points', {
-            order_id: orderResponse.data.id
-          })
+      // Puan kazanıldıysa göster
+      if (orderResponse.data.points) {
+        const { points_earned, new_balance, campaign_bonuses } = orderResponse.data.points
+        
+        // Puan kazanma bildirimi
+        toast((t) => (
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <span className="text-xl">🎉</span>
+              </div>
+              <div>
+                <p className="font-bold">Tebrikler!</p>
+                <p className="text-sm">{points_earned} puan kazandınız!</p>
+              </div>
+            </div>
+            
+            {campaign_bonuses && campaign_bonuses.length > 0 && (
+              <div className="ml-12 text-xs text-gray-600">
+                {campaign_bonuses.map((bonus, i) => (
+                  <p key={i}>• {bonus.campaign_name}: +{bonus.bonus_points} puan</p>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-2 ml-12 flex items-center gap-2 text-sm">
+              <span>Yeni bakiye:</span>
+              <span className="font-bold text-green-600">{new_balance} puan</span>
+            </div>
+          </div>
+        ), {
+          duration: 5000,
+          position: 'top-center',
+          style: {
+            background: '#fff',
+            color: '#000',
+            padding: '16px',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }
+        })
 
-          toast.success(
-            `Tebrikler! ${pointsResponse.data.points_earned} puan kazandınız!`,
-            { duration: 5000 }
-          )
-        } catch (err) {
-          console.error('Puan kazanma hatası:', err)
-        }
+        // Sadakat bilgilerini güncelle
+        fetchLoyaltyData(customer.id)
       }
 
       // Sepeti temizle ve onay sayfasına yönlendir
       clearCart()
-      navigate('/confirm', { state: { orderId: orderResponse.data.id } })
+      navigate('/confirm', { state: { orderId: orderResponse.data.order.id } })
+      
     } catch (err) {
       console.error('Sipariş tamamlama hatası:', err)
       toast.error('Sipariş tamamlanamadı. Lütfen tekrar deneyin.')
     }
   }
 
+  // Sadakat kartı bileşeni
+  const LoyaltyCard = () => {
+    if (!customer || !loyaltyData) return null
+
+    return (
+      <div 
+        onClick={() => setShowLoyaltyProfile(true)}
+        className="fixed bottom-20 right-4 z-40 bg-white rounded-lg shadow-lg p-3 cursor-pointer hover:shadow-xl transition-shadow"
+        style={{ width: '280px' }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+              <span className="text-lg">⭐</span>
+            </div>
+            <div>
+              <p className="font-medium text-sm">{customer.full_name || customer.phone_number}</p>
+              <p className="text-xs text-gray-500">{loyaltyData.tier_level} Üye</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-bold text-amber-600">{loyaltyData.current_points || 0}</p>
+            <p className="text-xs text-gray-500">Puan</p>
+          </div>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+          <div 
+            className="bg-amber-600 h-1.5 rounded-full transition-all"
+            style={{ width: `${Math.min((loyaltyData.current_points / loyaltyData.next_tier_requirement) * 100, 100)}%` }}
+          ></div>
+        </div>
+        <p className="text-xs text-gray-500 text-center">
+          {loyaltyData.next_tier_requirement - loyaltyData.current_points} puan ile {loyaltyData.next_tier} seviyesine yükselebilirsiniz
+        </p>
+      </div>
+    )
+  }
+
+  // Header'ı güncelle
+  const renderHeader = () => (
+    <div className="w-full">
+      <CesmeHeader 
+        customer={customer}
+        loyaltyData={loyaltyData}
+        onLoginClick={() => setShowLoginModal(true)}
+        onProfileClick={() => setShowLoyaltyProfile(true)}
+        onLogout={() => {
+          localStorage.removeItem('customer_token');
+          localStorage.removeItem('customer_data');
+          setCustomer(null);
+          setLoyaltyData(null);
+        }}
+      />
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
       <div
         className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
       >
-        <CesmeHeader 
-          customer={customer}
-          onLoginClick={() => setShowLoginModal(true)}
-          onProfileClick={() => setShowLoyaltyProfile(true)}
-          onLogout={() => {
-            localStorage.removeItem('customer_token');
-            localStorage.removeItem('customer_data');
-            setCustomer(null);
-          }}
-        />
+        {renderHeader()}
       </div>
+
+      {/* Müşteri giriş yapmışsa sadakat kartını göster */}
+      {customer && <LoyaltyCard />}
 
       {/* Sabit Kategori Header */}
       {showCategoryHeader && (
@@ -918,13 +1036,70 @@ const QrMenu = () => {
                   </div>
                 ))}
 
+                {/* Puan kullanımı bölümü */}
+                {customer && loyaltyData && loyaltyData.current_points > 0 && (
+                  <div className="mt-4">
+                    {selectedPoints > 0 ? (
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-green-800">Puan İndirimi</span>
+                          <span className="font-bold text-green-600">-{discountAmount.toFixed(2)} ₺</span>
+                        </div>
+                        <div className="text-sm text-green-700">
+                          {selectedPoints} puan kullanılıyor
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedPoints(null)
+                            setDiscountAmount(0)
+                          }}
+                          className="text-sm text-red-600 hover:text-red-700 mt-1"
+                        >
+                          İptal Et
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-amber-50 rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">Kullanılabilir Puan</span>
+                          <span className="font-bold text-amber-600">{loyaltyData.current_points}</span>
+                        </div>
+                        <button
+                          className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                          onClick={() => setShowPointsModal(true)}
+                        >
+                          Puan Kullan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Toplam tutar */}
                 <div className="mt-4 flex justify-between items-center py-3 border-t border-b border-[#B8D7DD]/20">
-                  <span className="font-medium">Toplam</span>
-                  <span className="text-lg font-bold text-[#D98A3D]">
+                  <span className="font-medium">Ara Toplam</span>
+                  <span className="text-lg font-bold">
                     {cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)} ₺
                   </span>
                 </div>
 
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center py-3">
+                    <span className="font-medium">İndirim</span>
+                    <span className="text-lg font-bold text-green-600">
+                      -{discountAmount.toFixed(2)} ₺
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center py-3 border-t">
+                  <span className="font-medium">Toplam</span>
+                  <span className="text-lg font-bold text-[#D98A3D]">
+                    {calculateDiscountedTotal().toFixed(2)} ₺
+                  </span>
+                </div>
+
+                {/* Siparişi tamamla butonu */}
                 <div className="flex flex-col gap-2 mt-6">
                   <button
                     className="w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors"
@@ -949,15 +1124,16 @@ const QrMenu = () => {
       {showLoginModal && (
         <CustomerLogin
           onSuccess={(customerData) => {
-            setCustomer(customerData);
-            setShowLoginModal(false);
+            setCustomer(customerData)
+            setShowLoginModal(false)
+            fetchLoyaltyData(customerData.id)
           }}
           onClose={() => setShowLoginModal(false)}
         />
       )}
 
       {/* Sadakat Profili Modal */}
-      {showLoyaltyProfile && (
+      {showLoyaltyProfile && customer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
             <button
@@ -970,19 +1146,38 @@ const QrMenu = () => {
             <h2 className="text-xl font-bold mb-4">Sadakat Kartlarım</h2>
             <LoyaltyProfile customer={customer} />
             
-            <button
-              onClick={() => {
-                localStorage.removeItem('customer_token');
-                localStorage.removeItem('customer_data');
-                setCustomer(null);
-                setShowLoyaltyProfile(false);
-              }}
-              className="w-full mt-4 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-            >
-              Çıkış Yap
-            </button>
+            <div className="mt-6 space-y-3">
+              <h3 className="font-medium">Puan Geçmişi</h3>
+              {loyaltyData?.recent_transactions?.map((transaction, index) => (
+                <div key={index} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{transaction.description}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(transaction.created_at).toLocaleDateString('tr-TR')}
+                    </p>
+                  </div>
+                  <span className={`font-bold ${
+                    transaction.transaction_type === 'earn' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {transaction.transaction_type === 'earn' ? '+' : '-'}{transaction.points}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Puan Kullanımı Modalı */}
+      {showPointsModal && customer && (
+        <LoyaltyPointsModal
+          show={showPointsModal}
+          onClose={() => setShowPointsModal(false)}
+          customer={customer}
+          brandId={branchId}
+          orderTotal={cart.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+          onPointsSelected={handlePointsSelected}
+        />
       )}
     </div>
   )

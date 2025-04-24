@@ -1,6 +1,7 @@
 // src/layout/MainLayout.jsx - Improved Navigation
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
+import { FiGift, FiStar, FiActivity } from "react-icons/fi"
 import { useAuth } from "../contexts/AuthContext"
 import { FiLogOut, FiUser, FiBriefcase, FiLayers, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap, FiSettings, FiMenu, FiX } from "react-icons/fi"
 import api from "../lib/axios"
@@ -29,6 +30,8 @@ const MainLayout = () => {
       setExpandedGroup('brands');
     } else if (location.pathname.includes('/branches')) {
       setExpandedGroup('branches');
+    } else if (location.pathname.includes('/loyalty')) {
+      setExpandedGroup('loyalty');
     }
   }, [location.pathname]);
 
@@ -144,6 +147,21 @@ const MainLayout = () => {
         items: [
           { path: "/admin/branches", label: "Tüm Şubeler", icon: <FiMap size={18} /> },
           // Burada dinamik olarak son ziyaret edilen şubeleri gösterebilirsiniz
+        ]
+      });
+      
+      // Sadakat Programı Grubu
+      menuGroups.push({
+        id: "loyalty",
+        label: "Sadakat Programı",
+        icon: <FiStar size={20} />,
+        items: [
+          { path: "/admin/loyalty", label: "Dashboard", icon: <FiStar size={18} /> },
+          { path: "/admin/loyalty/campaigns", label: "Kampanyalar", icon: <FiGift size={18} /> },
+          { path: "/admin/loyalty/customers", label: "Müşteriler", icon: <FiUsers size={18} /> },
+          { path: "/admin/loyalty/points/manual", label: "Manuel İşlem", icon: <FiActivity size={18} /> },
+          { path: "/admin/loyalty/reports", label: "Raporlar", icon: <FiBarChart2 size={18} /> },
+          { path: "/admin/loyalty/settings", label: "Ayarlar", icon: <FiSettings size={18} /> },
         ]
       });
       
