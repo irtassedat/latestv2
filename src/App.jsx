@@ -28,7 +28,9 @@ import LoyaltySettingsManager from "./components/LoyaltySettingsManager";
 import LoyaltyReportsManager from "./components/LoyaltyReportsManager";
 import ManualPointTransaction from "./components/ManualPointTransaction";
 import BranchPointsTransfer from "./components/BranchPointsTransfer";
-
+import LoyaltyRewardsManager from "./components/LoyaltyRewardsManager";
+import RewardsCatalog from "./components/RewardsCatalog";
+import RewardsHistory from "./components/RewardsHistory";
 
 function App() {
   return (
@@ -86,6 +88,10 @@ function App() {
                 <Route path="/admin/loyalty/settings" element={<LoyaltySettingsManager />} />
                 <Route path="/admin/loyalty/branch-transfer" element={<BranchPointsTransfer />} />
 
+                {/* Ödül Sistemi */}
+                <Route path="/admin/loyalty/rewards" element={<LoyaltyRewardsManager />} />
+                <Route path="/admin/loyalty/rewards/catalog" element={<RewardsCatalog />} />
+                <Route path="/admin/loyalty/rewards/history" element={<RewardsHistory />} />
               </Route>
             </Route>
           </Route>

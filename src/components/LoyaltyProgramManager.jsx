@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiStar, FiGift, FiUsers, FiSettings, FiTrendingUp,
-  FiAward, FiActivity, FiCreditCard, FiBarChart2
+  FiAward, FiActivity, FiCreditCard, FiBarChart2, FiPackage,
 } from "react-icons/fi";
 import { HiArrowsRightLeft } from "react-icons/hi2";
 import { useAuth } from "../contexts/AuthContext";
@@ -173,14 +173,13 @@ const LoyaltyProgramManager = () => {
               {recentTransactions.map((transaction) => (
                 <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      transaction.transaction_type === 'earn' ? 'bg-green-100 text-green-600' : 
-                      transaction.transaction_type === 'spend' ? 'bg-red-100 text-red-600' : 
-                      'bg-blue-100 text-blue-600'
-                    }`}>
-                      {transaction.transaction_type === 'earn' ? <FiTrendingUp /> : 
-                       transaction.transaction_type === 'spend' ? <FiCreditCard /> : 
-                       <FiAward />}
+                    <div className={`p-2 rounded-full ${transaction.transaction_type === 'earn' ? 'bg-green-100 text-green-600' :
+                        transaction.transaction_type === 'spend' ? 'bg-red-100 text-red-600' :
+                          'bg-blue-100 text-blue-600'
+                      }`}>
+                      {transaction.transaction_type === 'earn' ? <FiTrendingUp /> :
+                        transaction.transaction_type === 'spend' ? <FiCreditCard /> :
+                          <FiAward />}
                     </div>
                     <div>
                       <p className="font-medium">{transaction.customer_name || 'Anonim'}</p>
@@ -188,11 +187,10 @@ const LoyaltyProgramManager = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-bold ${
-                      transaction.transaction_type === 'earn' ? 'text-green-600' : 
-                      transaction.transaction_type === 'spend' ? 'text-red-600' : 
-                      'text-blue-600'
-                    }`}>
+                    <p className={`font-bold ${transaction.transaction_type === 'earn' ? 'text-green-600' :
+                        transaction.transaction_type === 'spend' ? 'text-red-600' :
+                          'text-blue-600'
+                      }`}>
                       {transaction.transaction_type === 'spend' ? '-' : '+'}{transaction.points} puan
                     </p>
                     <p className="text-xs text-gray-500">
@@ -223,10 +221,10 @@ const LoyaltyProgramManager = () => {
                 <div key={customer.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold
-                      ${index === 0 ? 'bg-yellow-500' : 
-                        index === 1 ? 'bg-gray-400' : 
-                        index === 2 ? 'bg-amber-700' : 
-                        'bg-blue-500'}`}>
+                      ${index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-400' :
+                          index === 2 ? 'bg-amber-700' :
+                            'bg-blue-500'}`}>
                       {index + 1}
                     </div>
                     <div>
@@ -301,7 +299,7 @@ const LoyaltyProgramManager = () => {
                 <p className="text-sm">Kampanya oluştur</p>
               </div>
             </button>
-            
+
             <button
               onClick={() => navigate('/admin/loyalty/points/manual')}
               className="flex items-center gap-3 p-4 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
@@ -323,7 +321,7 @@ const LoyaltyProgramManager = () => {
                 <p className="text-sm">Puanları transfer et</p>
               </div>
             </button>
-            
+
             <button
               onClick={() => navigate('/admin/loyalty/reports')}
               className="flex items-center gap-3 p-4 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100"
@@ -334,7 +332,7 @@ const LoyaltyProgramManager = () => {
                 <p className="text-sm">Detaylı analizler</p>
               </div>
             </button>
-            
+
             <button
               onClick={() => navigate('/admin/loyalty/tiers')}
               className="flex items-center gap-3 p-4 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
@@ -343,6 +341,16 @@ const LoyaltyProgramManager = () => {
               <div className="text-left">
                 <p className="font-medium">Üyelik Seviyeleri</p>
                 <p className="text-sm">Tier yönetimi</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/admin/loyalty/rewards')}
+              className="flex items-center gap-3 p-4 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100"
+            >
+              <FiPackage size={24} />
+              <div className="text-left">
+                <p className="font-medium">Ödül Yönetimi</p>
+                <p className="text-sm">Ödül kataloğunu düzenle</p>
               </div>
             </button>
           </div>

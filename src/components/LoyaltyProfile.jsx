@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FiGift, FiStar, FiClock, FiTrendingUp, FiAward } from 'react-icons/fi';
 import api from '../lib/axios';
+import RewardsCatalog from './RewardsCatalog';
+import RewardsHistory from './RewardsHistory';
 
 const LoyaltyProfile = ({ customer }) => {
   const [loyaltyAccounts, setLoyaltyAccounts] = useState([]);
@@ -8,6 +10,7 @@ const LoyaltyProfile = ({ customer }) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'rewards', 'history'
 
   useEffect(() => {
     fetchLoyaltyAccounts();
@@ -172,59 +175,118 @@ const LoyaltyProfile = ({ customer }) => {
         ))}
       </div>
 
-      {/* İşlem Geçmişi */}
+      {/* Tab Menü ve İçerikler */}
       {selectedAccount && (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">İşlem Geçmişi</h3>
-          
-          {transactionsLoading ? (
-            <div className="animate-pulse space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-12 bg-gray-100 rounded"></div>
-              ))}
+        <div className="bg-white rounded-xl shadow-md mt-6">
+          {/* Tab Menü */}
+          <div className="border-b">
+            <div className="flex">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+                  activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Genel Bakış
+              </button>
+              <button
+                onClick={() => setActiveTab('rewards')}
+                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+                  activeTab === 'rewards'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Ödül Kataloğu
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+                  activeTab === 'history'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Ödül Geçmişi
+              </button>
             </div>
-          ) : transactions.length > 0 ? (
-            <div className="space-y-3">
-              {transactions.map(transaction => (
-                <div 
-                  key={transaction.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      transaction.transaction_type === 'earn' ? 'bg-green-100' :
-                      transaction.transaction_type === 'spend' ? 'bg-red-100' :
-                      'bg-blue-100'
-                    }`}>
-                      {transaction.transaction_type === 'earn' ? (
-                        <FiTrendingUp className="text-green-600" />
-                      ) : transaction.transaction_type === 'spend' ? (
-                        <FiGift className="text-red-600" />
-                      ) : (
-                        <FiAward className="text-blue-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{transaction.description}</p>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(transaction.created_at)}
-                        {transaction.branch_name && ` • ${transaction.branch_name}`}
-                      </p>
-                    </div>
+          </div>
+
+          {/* Tab İçerikleri */}
+          <div className="p-6">
+            {activeTab === 'overview' && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">İşlem Geçmişi</h3>
+                
+                {transactionsLoading ? (
+                  <div className="animate-pulse space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-12 bg-gray-100 rounded"></div>
+                    ))}
                   </div>
-                  <div className={`font-bold ${
-                    transaction.transaction_type === 'earn' ? 'text-green-600' :
-                    transaction.transaction_type === 'spend' ? 'text-red-600' :
-                    'text-blue-600'
-                  }`}>
-                    {transaction.transaction_type === 'spend' ? '-' : '+'}{transaction.points}
+                ) : transactions.length > 0 ? (
+                  <div className="space-y-3">
+                    {transactions.map(transaction => (
+                      <div 
+                        key={transaction.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${
+                            transaction.transaction_type === 'earn' ? 'bg-green-100' :
+                            transaction.transaction_type === 'spend' ? 'bg-red-100' :
+                            'bg-blue-100'
+                          }`}>
+                            {transaction.transaction_type === 'earn' ? (
+                              <FiTrendingUp className="text-green-600" />
+                            ) : transaction.transaction_type === 'spend' ? (
+                              <FiGift className="text-red-600" />
+                            ) : (
+                              <FiAward className="text-blue-600" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{transaction.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(transaction.created_at)}
+                              {transaction.branch_name && ` • ${transaction.branch_name}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`font-bold ${
+                          transaction.transaction_type === 'earn' ? 'text-green-600' :
+                          transaction.transaction_type === 'spend' ? 'text-red-600' :
+                          'text-blue-600'
+                        }`}>
+                          {transaction.transaction_type === 'spend' ? '-' : '+'}{transaction.points}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 py-4">Henüz işlem yok</p>
-          )}
+                ) : (
+                  <p className="text-center text-gray-500 py-4">Henüz işlem yok</p>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'rewards' && selectedAccount && (
+              <RewardsCatalog 
+                customer={customer}
+                brandId={selectedAccount.brand_id}
+                onRedeemSuccess={() => {
+                  // Ödül kullanıldığında sadakat verilerini yenile
+                  fetchLoyaltyAccounts();
+                  fetchTransactions(selectedAccount.id);
+                }}
+              />
+            )}
+
+            {activeTab === 'history' && (
+              <RewardsHistory customer={customer} />
+            )}
+          </div>
         </div>
       )}
 

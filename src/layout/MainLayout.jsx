@@ -159,6 +159,7 @@ const MainLayout = () => {
           { path: "/admin/loyalty", label: "Dashboard", icon: <FiStar size={18} /> },
           { path: "/admin/loyalty/campaigns", label: "Kampanyalar", icon: <FiGift size={18} /> },
           { path: "/admin/loyalty/customers", label: "Müşteriler", icon: <FiUsers size={18} /> },
+          { path: "/admin/loyalty/rewards", label: "Ödül Yönetimi", icon: <FiPackage size={18} /> }, // YENİ EKLENEN
           { path: "/admin/loyalty/points/manual", label: "Manuel İşlem", icon: <FiActivity size={18} /> },
           { path: "/admin/loyalty/reports", label: "Raporlar", icon: <FiBarChart2 size={18} /> },
           { path: "/admin/loyalty/settings", label: "Ayarlar", icon: <FiSettings size={18} /> },
