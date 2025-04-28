@@ -1,6 +1,6 @@
 // src/components/ThemeManager.jsx
 import { useState, useEffect } from "react";
-import { FaPalette, FaImages, FaSave, FaUndo, FaImage, FaToggleOn, FaToggleOff } from "react-icons/fa";
+import { FaPalette, FaImages, FaSave, FaUndo, FaImage, FaToggleOn, FaToggleOff, FaVideo } from "react-icons/fa";
 import { ChromePicker } from "react-color";
 import api from "../lib/axios";
 import toast from "react-hot-toast";
@@ -69,6 +69,7 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
   const [activeTab, setActiveTab] = useState("colors");
   const [colorPickerOpen, setColorPickerOpen] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [originalSettings, setOriginalSettings] = useState(null);
 
   useEffect(() => {
@@ -165,63 +166,142 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("logo", file);
-
     try {
-      const response = await api.post("/api/upload", formData);
+      setUploadLoading(true);
       
-      setThemeSettings(prev => ({
-        ...prev,
-        components: {
-          ...prev.components,
-          logo: {
-            ...prev.components.logo,
-            url: response.data.url,
+      // Logo yükleme endpoint'ine dosyayı gönder
+      const formData = new FormData();
+      formData.append("logo", file);
+      
+      const response = await api.post("/api/theme/upload-logo", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      if (response.data.success) {
+        setThemeSettings(prev => ({
+          ...prev,
+          components: {
+            ...prev.components,
+            logo: {
+              ...prev.components.logo,
+              url: response.data.url,
+            },
           },
-        },
-      }));
-      
-      toast.success("Logo yüklendi");
+        }));
+        
+        toast.success("Logo yüklendi");
+      } else {
+        throw new Error(response.data.error || "Logo yüklenemedi");
+      }
     } catch (err) {
       console.error("Logo yüklenirken hata:", err);
-      toast.error("Logo yüklenemedi");
+      toast.error(err.response?.data?.error || "Logo yüklenemedi");
+      
+      // Hata durumunda fallback olarak FileReader kullan
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setThemeSettings(prev => ({
+          ...prev,
+          components: {
+            ...prev.components,
+            logo: {
+              ...prev.components.logo,
+              url: e.target.result,
+            },
+          },
+        }));
+        
+        toast.success("Logo yerel olarak yüklendi (geçici)");
+      };
+      
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadLoading(false);
     }
   };
 
-  const handleSliderImageUpload = async (e) => {
+  const handleMediaUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append("image", file);
-
+    
+    const isVideo = file.type.startsWith('video/');
+    
     try {
-      const response = await api.post("/api/upload", formData);
+      setUploadLoading(true);
       
-      setThemeSettings(prev => ({
-        ...prev,
-        components: {
-          ...prev.components,
-          slider: {
-            ...prev.components.slider,
-            slides: [
-              ...prev.components.slider.slides,
-              {
-                id: Date.now(),
-                image: response.data.url,
-                title: "",
-                description: "",
-              },
-            ],
+      // Media yükleme endpoint'ine dosyayı gönder
+      const formData = new FormData();
+      formData.append("media", file);
+      
+      const response = await api.post("/api/theme/upload-media", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      if (response.data.success) {
+        // Doğru URL'yi oluştur - sunucu adresi ile birleştir
+        const fileUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5050'}${response.data.url}`;
+        
+        setThemeSettings(prev => ({
+          ...prev,
+          components: {
+            ...prev.components,
+            slider: {
+              ...prev.components.slider,
+              slides: [
+                ...prev.components.slider.slides,
+                {
+                  id: Date.now(),
+                  type: response.data.type,
+                  media: fileUrl, // response.data.url yerine fileUrl kullan
+                  title: "",
+                  description: "",
+                },
+              ],
+            },
           },
-        },
-      }));
-      
-      toast.success("Slider görseli eklendi");
+        }));
+        
+        toast.success(response.data.type === 'video' ? "Video eklendi" : "Görsel eklendi");
+      } else {
+        throw new Error(response.data.error || "Medya yüklenemedi");
+      }
     } catch (err) {
-      console.error("Slider görseli yüklenirken hata:", err);
-      toast.error("Slider görseli yüklenemedi");
+      console.error("Medya yüklenirken hata:", err);
+      toast.error(err.response?.data?.error || "Medya yüklenemedi");
+      
+      // Hata durumunda fallback olarak FileReader kullan
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setThemeSettings(prev => ({
+          ...prev,
+          components: {
+            ...prev.components,
+            slider: {
+              ...prev.components.slider,
+              slides: [
+                ...prev.components.slider.slides,
+                {
+                  id: Date.now(),
+                  type: isVideo ? 'video' : 'image',
+                  media: e.target.result,
+                  title: "",
+                  description: "",
+                },
+              ],
+            },
+          },
+        }));
+        
+        toast.success(isVideo ? "Video yerel olarak eklendi (geçici)" : "Görsel yerel olarak eklendi (geçici)");
+      };
+      
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadLoading(false);
     }
   };
 
@@ -287,14 +367,15 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
             alt="Logo"
             className="h-16 object-contain bg-white p-2 rounded"
           />
-          <label className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600">
+          <label className={`flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 ${uploadLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <FaImage />
-            Logo Yükle
+            {uploadLoading ? "Yükleniyor..." : "Logo Yükle"}
             <input
               type="file"
               accept="image/*"
               className="hidden"
               onChange={handleLogoUpload}
+              disabled={uploadLoading}
             />
           </label>
         </div>
@@ -320,6 +401,7 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
             className={`p-2 rounded-lg ${
               themeSettings.components.slider.enabled ? "bg-green-500" : "bg-gray-300"
             }`}
+            disabled={uploadLoading}
           >
             {themeSettings.components.slider.enabled ? <FaToggleOn size={24} /> : <FaToggleOff size={24} />}
           </button>
@@ -328,14 +410,18 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
         {themeSettings.components.slider.enabled && (
           <>
             <div className="flex items-center gap-4 mb-4">
-              <label className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600">
-                <FaImages />
-                Slide Ekle
+              <label className={`flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 ${uploadLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <div className="flex items-center">
+                  <FaImages className="mr-1" />
+                  <FaVideo className="ml-1" />
+                </div>
+                {uploadLoading ? "Yükleniyor..." : "Medya Ekle"}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm"
                   className="hidden"
-                  onChange={handleSliderImageUpload}
+                  onChange={handleMediaUpload}
+                  disabled={uploadLoading}
                 />
               </label>
               
@@ -357,6 +443,7 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
                     }));
                   }}
                   className="w-20 p-1 border rounded"
+                  disabled={uploadLoading}
                 />
               </div>
             </div>
@@ -364,11 +451,19 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {themeSettings.components.slider.slides.map((slide, index) => (
                 <div key={slide.id} className="relative group">
-                  <img
-                    src={slide.image}
-                    alt={`Slide ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg"
-                  />
+                  {(slide.type === 'video' || (slide.media && slide.media.includes('video'))) ? (
+                    <video 
+                      src={slide.media || slide.image} 
+                      className="w-full h-32 object-cover rounded-lg"
+                      controls
+                    />
+                  ) : (
+                    <img
+                      src={slide.media || slide.image}
+                      alt={`Slide ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                  )}
                   <button
                     onClick={() => {
                       setThemeSettings(prev => ({
@@ -383,9 +478,13 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
                       }));
                     }}
                     className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={uploadLoading}
                   >
                     ×
                   </button>
+                  <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    {(slide.type === 'video' || (slide.media && slide.media.includes('video'))) ? 'Video' : 'Görsel'}
+                  </div>
                 </div>
               ))}
             </div>
@@ -654,15 +753,15 @@ const ThemeManager = ({ type, entityId, entityInfo }) => {
             <button
               onClick={handleReset}
               className="px-4 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-              disabled={loading}
+              disabled={loading || uploadLoading}
             >
               <FaUndo />
               Sıfırla
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
-              disabled={loading}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || uploadLoading}
             >
               <FaSave />
               {loading ? "Kaydediliyor..." : "Kaydet"}

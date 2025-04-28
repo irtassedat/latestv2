@@ -1,4 +1,4 @@
-// src/pages/QrMenu.jsx - Tema desteği eklenmiş hali (orijinal UI korunarak)
+// src/pages/QrMenu.jsx - Tema desteği ve medya işleme geliştirmeleri ile
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useLocation, useParams } from "react-router-dom"
 import api from "../lib/axios"
@@ -31,19 +31,20 @@ const QrMenu = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [sliderContainerHeight, setSliderContainerHeight] = useState(0)
   const sliderContainerRef = useRef(null)
+  const slideIntervalRef = useRef(null)
 
-  // Sadakat sistemi için yeni state'ler
+  // Sadakat sistemi için state'ler
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [customer, setCustomer] = useState(null)
   const [showLoyaltyProfile, setShowLoyaltyProfile] = useState(false)
   const [loyaltyData, setLoyaltyData] = useState(null)
 
-  // Puan kullanımı için yeni state'ler
+  // Puan kullanımı için state'ler
   const [showPointsModal, setShowPointsModal] = useState(false)
   const [selectedPoints, setSelectedPoints] = useState(null)
   const [discountAmount, setDiscountAmount] = useState(0)
 
-  // Tema için yeni state
+  // Tema için state
   const [theme, setTheme] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -53,6 +54,7 @@ const QrMenu = () => {
       if (!branchId) return;
       
       try {
+        setLoading(true);
         // Önce şube bilgilerini al
         const branchResponse = await api.get(`/api/branches/${branchId}`);
         console.log(`Şube ${branchId} bilgileri:`, branchResponse.data);
@@ -63,6 +65,7 @@ const QrMenu = () => {
         if (branchThemeResponse.data && Object.keys(branchThemeResponse.data).length > 0) {
           console.log(`Şube ${branchId} tema ayarları kullanılıyor:`, branchThemeResponse.data);
           setTheme(branchThemeResponse.data);
+          setLoading(false);
           return;
         }
         
@@ -78,6 +81,8 @@ const QrMenu = () => {
         }
       } catch (err) {
         console.error("Tema ayarları yüklenirken hata:", err);
+      } finally {
+        setLoading(false);
       }
     };
   
@@ -98,6 +103,20 @@ const QrMenu = () => {
 
     // Sadece seçilen tema ayarlarını override et, varsayılan değerleri koru
     styleElement.textContent = `
+      /* Ana renkler */
+      :root {
+        --primary-color: ${theme.colors?.primary || '#022B45'};
+        --secondary-color: ${theme.colors?.secondary || '#D98A3D'};
+        --accent-color: ${theme.colors?.accent || '#1a9c95'};
+        --background-color: ${theme.colors?.background || '#f3f4f6'};
+        --text-color: ${theme.colors?.text || '#1f2937'};
+      }
+      
+      /* Sayfa arka planı */
+      .theme-bg {
+        background-color: ${theme.colors?.background} !important;
+      }
+      
       /* Header tema override */
       .theme-header-bg {
         background-color: ${theme.colors?.headerBg} !important;
@@ -123,16 +142,46 @@ const QrMenu = () => {
       .theme-price-override {
         color: ${theme.colors?.priceColor} !important;
       }
+      
+      /* Font ayarları */
+      .theme-font-primary {
+        font-family: ${theme.fonts?.primary || 'Inter'}, sans-serif !important;
+      }
+      
+      .theme-font-secondary {
+        font-family: ${theme.fonts?.secondary || 'Roboto'}, sans-serif !important;
+      }
     `;
 
     document.head.appendChild(styleElement);
     console.log('Tema CSS eklendi');
 
+    // Font yükleme
+    if (theme.fonts?.primary || theme.fonts?.secondary) {
+      const primaryFont = theme.fonts?.primary || 'Inter';
+      const secondaryFont = theme.fonts?.secondary || 'Roboto';
+      
+      // Google Fonts'tan fontları yükle
+      const fontLink = document.createElement('link');
+      fontLink.id = 'dynamic-theme-fonts';
+      fontLink.rel = 'stylesheet';
+      fontLink.href = `https://fonts.googleapis.com/css2?family=${primaryFont.replace(' ', '+')}&family=${secondaryFont.replace(' ', '+')}&display=swap`;
+      document.head.appendChild(fontLink);
+      console.log('Font CSS eklendi');
+    }
+
     return () => {
-      const element = document.getElementById('dynamic-theme-styles');
-      if (element) {
-        document.head.removeChild(element);
+      const styleElem = document.getElementById('dynamic-theme-styles');
+      const fontElem = document.getElementById('dynamic-theme-fonts');
+      
+      if (styleElem) {
+        document.head.removeChild(styleElem);
         console.log('Tema CSS kaldırıldı');
+      }
+      
+      if (fontElem) {
+        document.head.removeChild(fontElem);
+        console.log('Font CSS kaldırıldı');
       }
     };
   }, [theme]);
@@ -172,16 +221,20 @@ const QrMenu = () => {
   }
 
   // Promosyon slider verileri - tema ayarlarından al ama varsayılanları koru
-  const promotionSlides = theme?.components?.slider?.slides || [
-    {
-      id: 1,
-      image: "/uploads/dere-otlu-pogaca-slider.png"
-    },
-    {
-      id: 2,
-      image: "/uploads/dere-otlu-pogaca-slider.png"
-    }
-  ];
+  const promotionSlides = theme?.components?.slider?.slides?.length > 0 
+    ? theme.components.slider.slides 
+    : [
+      {
+        id: 1,
+        image: "/uploads/placeholder.jpg",
+        type: "image"
+      },
+      {
+        id: 2,
+        image: "/uploads/placeholder.jpg", 
+        type: "image"
+      }
+    ];
 
   // Slider boyutlarını hesapla
   useEffect(() => {
@@ -272,11 +325,25 @@ const QrMenu = () => {
 
   // Slider otomatik geçiş
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % promotionSlides.length)
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [promotionSlides.length])
+    if (slideIntervalRef.current) {
+      clearInterval(slideIntervalRef.current);
+    }
+    
+    if (promotionSlides.length > 1) {
+      // Slider otomatik geçiş hızını tema ayarlarından al (varsa)
+      const autoPlaySpeed = theme?.components?.slider?.autoPlaySpeed || 5000;
+      
+      slideIntervalRef.current = setInterval(() => {
+        setCurrentSlide(prev => (prev + 1) % promotionSlides.length);
+      }, autoPlaySpeed);
+    }
+    
+    return () => {
+      if (slideIntervalRef.current) {
+        clearInterval(slideIntervalRef.current);
+      }
+    };
+  }, [promotionSlides.length, theme?.components?.slider?.autoPlaySpeed]);
 
   // Modal açıldığında body scroll'u engelle
   useEffect(() => {
@@ -572,6 +639,34 @@ const QrMenu = () => {
     }
   }
 
+  const handleMediaError = (e, slide) => {
+    console.error("Medya yüklenemedi:", slide?.media || slide?.image);
+    
+    // SVG placeholder oluştur
+    const placeholderSvg = `
+      <svg width="100%" height="100%" viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#f3f4f6"/>
+        <text x="50%" y="50%" font-size="24" text-anchor="middle" alignment-baseline="middle" font-family="Arial, sans-serif" fill="#6b7280">
+          ${slide.type === 'video' ? 'Video Gösterimi' : 'Promosyon Görseli'}
+        </text>
+      </svg>
+    `;
+    
+    const encodedSvg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeholderSvg)}`;
+    
+    if (slide.type === 'video') {
+      // Video için placeholder div oluştur
+      e.target.parentNode.innerHTML = `
+        <div class="w-full h-full flex items-center justify-center bg-gray-100">
+          <img src="${encodedSvg}" alt="Video Gösterimi" class="w-full h-full object-cover"/>
+        </div>
+      `;
+    } else {
+      // Görsel için src değiştir
+      e.target.src = encodedSvg;
+    }
+  }
+
   const handleProductClick = (product) => {
     navigate(`/product/${product.id}`, { state: { product, branchId } });
 
@@ -720,7 +815,7 @@ const QrMenu = () => {
   )
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
+    <div className={`min-h-screen pt-20 ${theme ? 'theme-bg theme-font-primary' : 'bg-gray-100'}`} ref={containerRef}>
       <div
         className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md ${theme ? 'theme-header-bg' : 'bg-[#1a9c95]/90'} transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
       >
@@ -779,51 +874,71 @@ const QrMenu = () => {
 
       <div className="px-4 py-4">
         {/* Promosyon Slider */}
-        <div className="mb-8">
-          <div
-            ref={sliderContainerRef}
-            className="w-full overflow-hidden relative bg-transparent rounded-lg"
-            style={{
-              height: `${sliderContainerHeight}px`,
-              backgroundColor: 'rgba(0, 0, 0, 0.05)'
-            }}
-          >
-            {promotionSlides.map((slide, index) => (
-              <div
-                key={slide.id}
-                className={`absolute inset-0 flex items-center justify-center ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                style={{
-                  transition: 'opacity 0.5s ease-in-out'
-                }}
-              >
-                <img
-                  src={slide.image}
-                  alt={`Promosyon ${index + 1}`}
-                  className="w-full h-full object-cover"
-                  onLoad={handleImageLoad}
-                  onError={(e) => {
-                    console.error("Görsel yüklenemedi:", e);
-                    e.target.src = "/uploads/placeholder.jpg";
+        {theme?.components?.slider?.enabled !== false && (
+          <div className="mb-8">
+            <div
+              ref={sliderContainerRef}
+              className="w-full overflow-hidden relative bg-transparent rounded-lg"
+              style={{
+                height: `${sliderContainerHeight}px`,
+                backgroundColor: 'rgba(0, 0, 0, 0.05)'
+              }}
+            >
+              {promotionSlides.map((slide, index) => (
+                <div
+                  key={slide.id}
+                  className={`absolute inset-0 flex items-center justify-center ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  style={{
+                    transition: 'opacity 0.5s ease-in-out'
                   }}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Slider Dots */}
-          <div className="relative w-full flex justify-center mt-2">
-            <div className="flex space-x-2">
-              {promotionSlides.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${index === currentSlide ? 'bg-white w-4' : 'bg-white/50'}`}
-                  aria-label={`Slayt ${index + 1}`}
-                />
+                >
+                  {(slide.type === 'video' || slide.media?.includes('video')) ? (
+                    // Video gösterimi
+                    <video
+                      src={slide.media}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      onLoadedMetadata={handleImageLoad}
+                      onError={(e) => handleMediaError(e, slide)}
+                    />
+                  ) : (
+                    // Görsel gösterimi
+                    <img
+                      src={slide.media || slide.image}
+                      alt={`Promosyon ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onLoad={handleImageLoad}
+                      onError={(e) => handleMediaError(e, slide)}
+                    />
+                  )}
+                </div>
               ))}
             </div>
+
+            {/* Slider Dots */}
+            {promotionSlides.length > 1 && (
+              <div className="relative w-full flex justify-center mt-2">
+                <div className="flex space-x-2">
+                  {promotionSlides.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentSlide(index)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        index === currentSlide 
+                          ? `bg-${theme?.colors?.primary ? theme.colors.primary.replace('#', '') : 'white'} w-4` 
+                          : 'bg-white/50'
+                      }`}
+                      aria-label={`Slayt ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Önerilen Ürünler */}
         {recommendedProducts.length > 0 && (
@@ -841,6 +956,10 @@ const QrMenu = () => {
                       src={p.image_url || "/uploads/guncellenecek.jpg"}
                       alt={p.name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error("Ürün görseli yüklenemedi:", p.name);
+                        e.target.src = "/uploads/placeholder.jpg";
+                      }}
                     />
                   </div>
                   <div className="flex-1">
@@ -890,7 +1009,7 @@ const QrMenu = () => {
                 onClick={() => handleCategoryClick(cat)}
                 className="snap-start flex flex-col items-center cursor-pointer"
               >
-                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? "ring-2 ring-white" : ""}`}>
+                <div className={`w-24 h-24 rounded-xl overflow-hidden shadow-md mb-2 ${activeCategory === cat ? `ring-2 ${theme ? `ring-[${theme.colors?.primary}]` : 'ring-white'}` : ""}`}>
                   <img
                     src={`/category/${toSlug(cat)}.jpg`}
                     alt={cat}
@@ -898,7 +1017,7 @@ const QrMenu = () => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="text-sm font-medium text-center">{cat}</span>
+                <span className={`text-sm font-medium text-center ${theme ? 'theme-font-primary' : ''}`}>{cat}</span>
               </div>
             ))}
           </div>
@@ -916,7 +1035,7 @@ const QrMenu = () => {
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex items-end p-4">
-                  <h2 className="text-white text-2xl font-bold">{category}</h2>
+                  <h2 className={`text-white text-2xl font-bold ${theme ? 'theme-font-secondary' : ''}`}>{category}</h2>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4">
@@ -937,6 +1056,10 @@ const QrMenu = () => {
                         }
                         alt={p.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error("Ürün görseli yüklenemedi:", p.name);
+                          e.target.src = "/uploads/placeholder.jpg";
+                        }}
                       />
                       <button
                         onClick={(e) => {
@@ -1046,7 +1169,7 @@ const QrMenu = () => {
 
               <button
                 onClick={() => setShowFilterModal(false)}
-                className="w-full bg-[#022B45] text-white py-2 rounded"
+                className={`w-full py-2 rounded ${theme ? 'theme-button-override' : 'bg-[#022B45] text-white'}`}
               >
                 Uygula
               </button>
@@ -1089,6 +1212,9 @@ const QrMenu = () => {
                           }
                           alt={item.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = "/uploads/placeholder.jpg";
+                          }}
                         />
                       </div>
                       <div>

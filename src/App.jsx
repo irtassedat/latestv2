@@ -1,4 +1,3 @@
-// src/App.jsx - Tema rotalarını eklenmiş hali
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
@@ -71,8 +70,9 @@ function App() {
                 <Route path="products" element={<Products />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="heatmap" element={<Heatmap />} />
-                <Route path="theme/brand/:id" element={<ThemeSettings />} />
-                <Route path="theme/branches" element={<BranchThemeSelector />} /> {/* YENİ EKLENEN */}
+                <Route path="theme/brand/:id" element={<ThemeSettings type="brand" />} />
+                <Route path="theme/branch/:id" element={<ThemeSettings type="branch" />} /> {/* GÜNCELLENDİ */}
+                <Route path="theme/branches" element={<BranchThemeSelector />} />
               </Route>
 
               {/* Hem Super Admin hem de Branch Manager erişebilir */}
@@ -82,8 +82,8 @@ function App() {
                 <Route path="branches/:branchId/analytics" element={<BranchAnalytics />} />
                 <Route path="analytics" element={<BranchAnalytics />} />
                 <Route path="orders" element={<AdminOrders />} />
-                <Route path="theme/branch/:id" element={<ThemeSettings />} /> {/* YENİ EKLENEN */}
-
+                <Route path="admin/theme/:type/:id" element={<ThemeSettings />} />
+                
                 {/* Sadakat Sistemi */}
                 <Route path="/admin/loyalty" element={<LoyaltyProgramManager />} />
                 <Route path="/admin/loyalty/campaigns" element={<LoyaltyCampaignManager />} />
