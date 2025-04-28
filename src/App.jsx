@@ -33,6 +33,7 @@ import RewardsCatalog from "./components/RewardsCatalog";
 import RewardsHistory from "./components/RewardsHistory";
 import ThemeSettings from "./pages/ThemeSettings";
 import BranchThemeSelector from "./pages/BranchThemeSelector";
+import BrandThemeSelector from "./pages/BrandThemeSelector";
 
 function App() {
   return (
@@ -71,7 +72,8 @@ function App() {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="heatmap" element={<Heatmap />} />
                 <Route path="theme/brand/:id" element={<ThemeSettings type="brand" />} />
-                <Route path="theme/branch/:id" element={<ThemeSettings type="branch" />} /> {/* GÜNCELLENDİ */}
+                <Route path="theme/branch/:id" element={<ThemeSettings type="branch" />} />
+                <Route path="theme/brands" element={<BrandThemeSelector />} /> {/* Yeni: Ana tema seçim sayfası */}
                 <Route path="theme/branches" element={<BranchThemeSelector />} />
               </Route>
 
@@ -82,22 +84,27 @@ function App() {
                 <Route path="branches/:branchId/analytics" element={<BranchAnalytics />} />
                 <Route path="analytics" element={<BranchAnalytics />} />
                 <Route path="orders" element={<AdminOrders />} />
-                <Route path="admin/theme/:type/:id" element={<ThemeSettings />} />
+                
+                {/* Yeni Tema Yönetimi Rotaları */}
+                <Route path="theme/brands" element={<BrandThemeSelector />} />
+                <Route path="theme/brand/:id" element={<ThemeSettings type="brand" />} />
+                <Route path="theme/branches" element={<BranchThemeSelector />} />
+                <Route path="theme/branch/:id" element={<ThemeSettings type="branch" />} />
                 
                 {/* Sadakat Sistemi */}
-                <Route path="/admin/loyalty" element={<LoyaltyProgramManager />} />
-                <Route path="/admin/loyalty/campaigns" element={<LoyaltyCampaignManager />} />
-                <Route path="/admin/loyalty/campaigns/new" element={<LoyaltyCampaignManager />} />
-                <Route path="/admin/loyalty/customers" element={<CustomerLoyaltyManager />} />
-                <Route path="/admin/loyalty/points/manual" element={<ManualPointTransaction />} />
-                <Route path="/admin/loyalty/reports" element={<LoyaltyReportsManager />} />
-                <Route path="/admin/loyalty/settings" element={<LoyaltySettingsManager />} />
-                <Route path="/admin/loyalty/branch-transfer" element={<BranchPointsTransfer />} />
+                <Route path="loyalty" element={<LoyaltyProgramManager />} />
+                <Route path="loyalty/campaigns" element={<LoyaltyCampaignManager />} />
+                <Route path="loyalty/campaigns/new" element={<LoyaltyCampaignManager />} />
+                <Route path="loyalty/customers" element={<CustomerLoyaltyManager />} />
+                <Route path="loyalty/points/manual" element={<ManualPointTransaction />} />
+                <Route path="loyalty/reports" element={<LoyaltyReportsManager />} />
+                <Route path="loyalty/settings" element={<LoyaltySettingsManager />} />
+                <Route path="loyalty/branch-transfer" element={<BranchPointsTransfer />} />
 
                 {/* Ödül Sistemi */}
-                <Route path="/admin/loyalty/rewards" element={<LoyaltyRewardsManager />} />
-                <Route path="/admin/loyalty/rewards/catalog" element={<RewardsCatalog />} />
-                <Route path="/admin/loyalty/rewards/history" element={<RewardsHistory />} />
+                <Route path="loyalty/rewards" element={<LoyaltyRewardsManager />} />
+                <Route path="loyalty/rewards/catalog" element={<RewardsCatalog />} />
+                <Route path="loyalty/rewards/history" element={<RewardsHistory />} />
               </Route>
             </Route>
           </Route>

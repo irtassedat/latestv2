@@ -1,4 +1,4 @@
-// src/layout/MainLayout.jsx - Tema menüsü eklenmiş hali
+// src/layout/MainLayout.jsx - Geliştirilmiş tema menüsü
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { FiGift, FiStar, FiActivity } from "react-icons/fi"
@@ -151,13 +151,13 @@ const MainLayout = () => {
         ]
       });
       
-      // Tema Yönetimi Grubu (YENİ EKLENEN)
+      // Tema Yönetimi Grubu - Super Admin için
       menuGroups.push({
         id: "theme",
         label: "Tema Yönetimi",
         icon: <MdPalette size={20} />,
         items: [
-          { path: `/admin/theme/brand/${currentUser?.brand_id || 1}`, label: "Marka Teması", icon: <MdPalette size={18} /> },
+          { path: "/admin/theme/brands", label: "Marka Temaları", icon: <MdPalette size={18} /> },
           { path: "/admin/theme/branches", label: "Şube Temaları", icon: <MdPalette size={18} /> },
         ]
       });
@@ -173,8 +173,8 @@ const MainLayout = () => {
       });
     }
     
-    // Branch Manager için tema yönetimi
-    if (isBranchManager && currentUser?.branch_id) {
+    // Branch Manager için tema yönetimi - Sadece kendi şubesi için
+    if (isBranchManager && currentUser?.branch_id && !isSuperAdmin) {
       menuGroups.push({
         id: "theme",
         label: "Tema Yönetimi",
