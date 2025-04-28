@@ -37,7 +37,7 @@ const QrMenu = () => {
   const [customer, setCustomer] = useState(null)
   const [showLoyaltyProfile, setShowLoyaltyProfile] = useState(false)
   const [loyaltyData, setLoyaltyData] = useState(null)
-  
+
   // Puan kullanımı için yeni state'ler
   const [showPointsModal, setShowPointsModal] = useState(false)
   const [selectedPoints, setSelectedPoints] = useState(null)
@@ -53,27 +53,34 @@ const QrMenu = () => {
       if (!branchId) return;
       
       try {
-        // Önce şube tema ayarlarını kontrol et - Public endpoint kullan
-        const branchResponse = await api.get(`/api/theme/public/settings/branch/${branchId}`);
-        if (Object.keys(branchResponse.data).length > 0) {
-          setTheme(branchResponse.data);
-        } else {
-          // Şube tema ayarı yoksa marka ayarlarını kontrol et
-          const branchData = await api.get(`/api/branches/${branchId}`);
-          if (branchData.data.brand_id) {
-            const brandResponse = await api.get(`/api/theme/public/settings/brand/${branchData.data.brand_id}`);
-            if (Object.keys(brandResponse.data).length > 0) {
-              setTheme(brandResponse.data);
-            }
+        // Önce şube bilgilerini al
+        const branchResponse = await api.get(`/api/branches/${branchId}`);
+        console.log(`Şube ${branchId} bilgileri:`, branchResponse.data);
+        
+        // Şube tema ayarları varsa, öncelikle onları kullan
+        const branchThemeResponse = await api.get(`/api/theme/public/settings/branch/${branchId}`);
+        
+        if (branchThemeResponse.data && Object.keys(branchThemeResponse.data).length > 0) {
+          console.log(`Şube ${branchId} tema ayarları kullanılıyor:`, branchThemeResponse.data);
+          setTheme(branchThemeResponse.data);
+          return;
+        }
+        
+        // Şube teması yoksa, markaya ait temayı kullan
+        if (branchResponse.data.brand_id) {
+          console.log(`Marka ${branchResponse.data.brand_id} tema ayarları alınıyor...`);
+          const brandThemeResponse = await api.get(`/api/theme/public/settings/brand/${branchResponse.data.brand_id}`);
+          
+          if (brandThemeResponse.data && Object.keys(brandThemeResponse.data).length > 0) {
+            console.log(`Marka ${branchResponse.data.brand_id} tema ayarları kullanılıyor:`, brandThemeResponse.data);
+            setTheme(brandThemeResponse.data);
           }
         }
       } catch (err) {
         console.error("Tema ayarları yüklenirken hata:", err);
-      } finally {
-        setLoading(false);
       }
     };
-
+  
     fetchTheme();
   }, [branchId]);
 
@@ -88,7 +95,7 @@ const QrMenu = () => {
 
     const styleElement = document.createElement('style');
     styleElement.id = 'dynamic-theme-styles';
-    
+
     // Sadece seçilen tema ayarlarını override et, varsayılan değerleri koru
     styleElement.textContent = `
       /* Header tema override */
@@ -584,7 +591,7 @@ const QrMenu = () => {
   const handleCompleteOrder = async () => {
     try {
       const totalPrice = calculateDiscountedTotal()
-      
+
       const orderData = {
         items: cart,
         total_price: totalPrice,
@@ -602,7 +609,7 @@ const QrMenu = () => {
       // Puan kazanıldıysa göster
       if (orderResponse.data.points) {
         const { points_earned, new_balance, campaign_bonuses } = orderResponse.data.points
-        
+
         // Puan kazanma bildirimi
         toast((t) => (
           <div className="flex flex-col">
@@ -615,7 +622,7 @@ const QrMenu = () => {
                 <p className="text-sm">{points_earned} puan kazandınız!</p>
               </div>
             </div>
-            
+
             {campaign_bonuses && campaign_bonuses.length > 0 && (
               <div className="ml-12 text-xs text-gray-600">
                 {campaign_bonuses.map((bonus, i) => (
@@ -623,7 +630,7 @@ const QrMenu = () => {
                 ))}
               </div>
             )}
-            
+
             <div className="mt-2 ml-12 flex items-center gap-2 text-sm">
               <span>Yeni bakiye:</span>
               <span className="font-bold text-green-600">{new_balance} puan</span>
@@ -648,7 +655,7 @@ const QrMenu = () => {
       // Sepeti temizle ve onay sayfasına yönlendir
       clearCart()
       navigate('/confirm', { state: { orderId: orderResponse.data.order.id } })
-      
+
     } catch (err) {
       console.error('Sipariş tamamlama hatası:', err)
       toast.error('Sipariş tamamlanamadı. Lütfen tekrar deneyin.')
@@ -660,7 +667,7 @@ const QrMenu = () => {
     if (!customer || !loyaltyData) return null
 
     return (
-      <div 
+      <div
         onClick={() => setShowLoyaltyProfile(true)}
         className="fixed bottom-20 right-4 z-40 bg-white rounded-lg shadow-lg p-3 cursor-pointer hover:shadow-xl transition-shadow"
         style={{ width: '280px' }}
@@ -681,7 +688,7 @@ const QrMenu = () => {
           </div>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
-          <div 
+          <div
             className="bg-amber-600 h-1.5 rounded-full transition-all"
             style={{ width: `${Math.min((loyaltyData.current_points / loyaltyData.next_tier_requirement) * 100, 100)}%` }}
           ></div>
@@ -696,7 +703,7 @@ const QrMenu = () => {
   // Header'ı güncelle
   const renderHeader = () => (
     <div className="w-full">
-      <CesmeHeader 
+      <CesmeHeader
         customer={customer}
         loyaltyData={loyaltyData}
         onLoginClick={() => setShowLoginModal(true)}
@@ -1230,10 +1237,10 @@ const QrMenu = () => {
             >
               ✕
             </button>
-            
+
             <h2 className="text-xl font-bold mb-4">Sadakat Kartlarım</h2>
             <LoyaltyProfile customer={customer} />
-            
+
             <div className="mt-6 space-y-3">
               <h3 className="font-medium">Puan Geçmişi</h3>
               {loyaltyData?.recent_transactions?.map((transaction, index) => (
@@ -1244,9 +1251,8 @@ const QrMenu = () => {
                       {new Date(transaction.created_at).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
-                  <span className={`font-bold ${
-                    transaction.transaction_type === 'earn' ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <span className={`font-bold ${transaction.transaction_type === 'earn' ? 'text-green-600' : 'text-red-600'
+                    }`}>
                     {transaction.transaction_type === 'earn' ? '+' : '-'}{transaction.points}
                   </span>
                 </div>

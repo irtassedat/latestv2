@@ -5,7 +5,7 @@ import { ChromePicker } from "react-color";
 import api from "../lib/axios";
 import toast from "react-hot-toast";
 
-const ThemeManager = ({ selectedBranch, brandId }) => {
+const ThemeManager = ({ type, entityId, entityInfo }) => {
   const [themeSettings, setThemeSettings] = useState({
     colors: {
       primary: "#022B45",
@@ -73,19 +73,27 @@ const ThemeManager = ({ selectedBranch, brandId }) => {
 
   useEffect(() => {
     fetchThemeSettings();
-  }, [selectedBranch, brandId]);
+  }, [type, entityId, entityInfo]);
 
   const fetchThemeSettings = async () => {
     try {
       setLoading(true);
-      // Önce type'ı kontrol edin
-      const type = selectedBranch ? 'branch' : brandId ? 'brand' : undefined;
-      const entityId = selectedBranch || brandId;
+      
+      console.log("Tema ayarları alınıyor:", {
+        type: type,
+        entityId: entityId,
+        entityInfo: entityInfo
+      });
+      
       if (!type || !entityId) {
         toast.error('Tema tipi veya ID eksik');
+        setLoading(false);
         return;
       }
+      
       const response = await api.get(`/api/theme/settings/${type}/${entityId}`);
+      
+      console.log(`${type.toUpperCase()} (ID: ${entityId}) tema ayarları alındı:`, response.data);
       
       if (Object.keys(response.data).length > 0) {
         setThemeSettings(response.data);
@@ -115,17 +123,26 @@ const ThemeManager = ({ selectedBranch, brandId }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      // Önce type'ı kontrol edin
-      const type = selectedBranch ? 'branch' : brandId ? 'brand' : undefined;
-      const entityId = selectedBranch || brandId;
+      
+      console.log('Tema kaydetme bilgileri:', { 
+        type: type, 
+        entityId: entityId,
+        entityInfo: entityInfo,
+        settings: themeSettings 
+      });
+      
       if (!type || !entityId) {
         toast.error('Tema tipi veya ID eksik');
+        setLoading(false);
         return;
       }
+      
       // API çağrısı
-      await api.put(`/api/theme/settings/${type}/${entityId}`, {
+      const response = await api.put(`/api/theme/settings/${type}/${entityId}`, {
         settings: themeSettings,
       });
+      
+      console.log(`${type.toUpperCase()} (ID: ${entityId}) tema ayarları kaydedildi:`, response.data);
       
       toast.success("Tema ayarları başarıyla kaydedildi");
       setOriginalSettings(themeSettings);
@@ -613,11 +630,26 @@ const ThemeManager = ({ selectedBranch, brandId }) => {
     </div>
   );
 
+  // Ayarları görüntüleme bilgisi ekle
+  const getEntityInfo = () => {
+    if (type === 'branch') {
+      return `Şube (ID: ${entityId})${entityInfo?.brand_id ? ` - ${entityInfo.brand_name || `Marka ID: ${entityInfo.brand_id}`}` : ''}`;
+    } else if (type === 'brand') {
+      return `Marka (ID: ${entityId})`;
+    }
+    return "Bilinmeyen";
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-lg">
       <div className="p-6 border-b">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold">Tema Yönetimi</h2>
+          <div>
+            <h2 className="text-xl font-bold">Tema Yönetimi</h2>
+            <div className="text-sm text-gray-500 mt-1">
+              {getEntityInfo()} için tema ayarları
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleReset}
