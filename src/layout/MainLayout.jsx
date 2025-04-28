@@ -1,4 +1,4 @@
-// src/layout/MainLayout.jsx - Geliştirilmiş tema menüsü
+// src/layout/MainLayout.jsx
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { FiGift, FiStar, FiActivity } from "react-icons/fi"
@@ -35,6 +35,10 @@ const MainLayout = () => {
       setExpandedGroup('loyalty');
     } else if (location.pathname.includes('/theme')) {
       setExpandedGroup('theme');
+    } else if (location.pathname.includes('/templates')) {
+      setExpandedGroup('templates');
+    } else if (location.pathname.includes('/data')) {
+      setExpandedGroup('data');
     }
   }, [location.pathname]);
 
@@ -70,7 +74,7 @@ const MainLayout = () => {
     if (currentUser) {
       fetchUserBranches();
     }
-  }, [currentUser, isSuperAdmin, isBranchManager]);
+  }, [currentUser, isSuperAdmin, isBranchManager, selectedBranchId]);
 
   // Session storage'dan seçili şubeyi yükle
   useEffect(() => {
@@ -173,14 +177,37 @@ const MainLayout = () => {
       });
     }
     
-    // Branch Manager için tema yönetimi - Sadece kendi şubesi için
-    if (isBranchManager && currentUser?.branch_id && !isSuperAdmin) {
+    // Branch Manager için özelleştirilmiş menüler
+    if (isBranchManager && !isSuperAdmin && currentUser?.branch_id) {
+      // Tema Yönetimi
       menuGroups.push({
         id: "theme",
         label: "Tema Yönetimi",
         icon: <MdPalette size={20} />,
         items: [
           { path: `/admin/theme/branch/${currentUser.branch_id}`, label: "Şube Teması", icon: <MdPalette size={18} /> },
+        ]
+      });
+      
+      // Şablon Yönetimi - Branch Manager için
+      menuGroups.push({
+        id: "templates",
+        label: "Şablonlar",
+        icon: <FiLayers size={20} />,
+        items: [
+          { path: `/admin/branches/${currentUser.branch_id}/templates/menu`, label: "Menü Şablonu", icon: <FiLayers size={18} /> },
+          { path: `/admin/branches/${currentUser.branch_id}/templates/price`, label: "Fiyat Şablonu", icon: <FiLayers size={18} /> },
+        ]
+      });
+      
+      // Veri Yönetimi - Branch Manager için
+      menuGroups.push({
+        id: "data",
+        label: "Veri Yönetimi",
+        icon: <FiFileText size={20} />,
+        items: [
+          { path: `/admin/branches/${currentUser.branch_id}/export`, label: "Veri Dışa Aktar", icon: <FiFileText size={18} /> },
+          { path: `/admin/branches/${currentUser.branch_id}/import`, label: "Veri İçe Aktar", icon: <FiFileText size={18} /> },
         ]
       });
     }
@@ -204,8 +231,13 @@ const MainLayout = () => {
     }
     
     // Diğer Menü Öğeleri - Hem Super Admin hem de Branch Manager için
+    // Şube Ürünleri link'ini branch manager için güncelleyelim
+    const branchProductsPath = isBranchManager && currentUser?.branch_id
+      ? `/admin/branches/${currentUser.branch_id}/products`
+      : "/admin/branch-products";
+
     const sharedItems = [
-      { path: "/admin/branch-products", label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
+      { path: branchProductsPath, label: "Şube Ürünleri", icon: <FiShoppingBag size={20} /> },
       { path: "/admin/orders", label: "Siparişler", icon: <FiFileText size={20} /> },
       { path: "/admin/analytics", label: "Analitikler", icon: <FiBarChart2 size={20} /> },
       { path: "/menu", label: "QR Menü", icon: <FiSmartphone size={20} /> },

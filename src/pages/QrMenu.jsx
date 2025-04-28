@@ -52,28 +52,28 @@ const QrMenu = () => {
   useEffect(() => {
     const fetchTheme = async () => {
       if (!branchId) return;
-      
+  
       try {
         setLoading(true);
-        // Önce şube bilgilerini al
-        const branchResponse = await api.get(`/api/branches/${branchId}`);
+        // Önce şube bilgilerini al - PUBLIC endpoint kullanın
+        const branchResponse = await api.get(`/api/branches/public/${branchId}`);
         console.log(`Şube ${branchId} bilgileri:`, branchResponse.data);
-        
-        // Şube tema ayarları varsa, öncelikle onları kullan
+  
+        // Şube tema ayarları varsa, öncelikle onları kullan - PUBLIC endpoint kullanın
         const branchThemeResponse = await api.get(`/api/theme/public/settings/branch/${branchId}`);
-        
+  
         if (branchThemeResponse.data && Object.keys(branchThemeResponse.data).length > 0) {
           console.log(`Şube ${branchId} tema ayarları kullanılıyor:`, branchThemeResponse.data);
           setTheme(branchThemeResponse.data);
           setLoading(false);
           return;
         }
-        
-        // Şube teması yoksa, markaya ait temayı kullan
+  
+        // Şube teması yoksa, markaya ait temayı kullan - PUBLIC endpoint kullanın
         if (branchResponse.data.brand_id) {
           console.log(`Marka ${branchResponse.data.brand_id} tema ayarları alınıyor...`);
           const brandThemeResponse = await api.get(`/api/theme/public/settings/brand/${branchResponse.data.brand_id}`);
-          
+  
           if (brandThemeResponse.data && Object.keys(brandThemeResponse.data).length > 0) {
             console.log(`Marka ${branchResponse.data.brand_id} tema ayarları kullanılıyor:`, brandThemeResponse.data);
             setTheme(brandThemeResponse.data);
@@ -160,7 +160,7 @@ const QrMenu = () => {
     if (theme.fonts?.primary || theme.fonts?.secondary) {
       const primaryFont = theme.fonts?.primary || 'Inter';
       const secondaryFont = theme.fonts?.secondary || 'Roboto';
-      
+
       // Google Fonts'tan fontları yükle
       const fontLink = document.createElement('link');
       fontLink.id = 'dynamic-theme-fonts';
@@ -173,12 +173,12 @@ const QrMenu = () => {
     return () => {
       const styleElem = document.getElementById('dynamic-theme-styles');
       const fontElem = document.getElementById('dynamic-theme-fonts');
-      
+
       if (styleElem) {
         document.head.removeChild(styleElem);
         console.log('Tema CSS kaldırıldı');
       }
-      
+
       if (fontElem) {
         document.head.removeChild(fontElem);
         console.log('Font CSS kaldırıldı');
@@ -221,8 +221,8 @@ const QrMenu = () => {
   }
 
   // Promosyon slider verileri - tema ayarlarından al ama varsayılanları koru
-  const promotionSlides = theme?.components?.slider?.slides?.length > 0 
-    ? theme.components.slider.slides 
+  const promotionSlides = theme?.components?.slider?.slides?.length > 0
+    ? theme.components.slider.slides
     : [
       {
         id: 1,
@@ -231,7 +231,7 @@ const QrMenu = () => {
       },
       {
         id: 2,
-        image: "/uploads/placeholder.jpg", 
+        image: "/uploads/placeholder.jpg",
         type: "image"
       }
     ];
@@ -328,16 +328,16 @@ const QrMenu = () => {
     if (slideIntervalRef.current) {
       clearInterval(slideIntervalRef.current);
     }
-    
+
     if (promotionSlides.length > 1) {
       // Slider otomatik geçiş hızını tema ayarlarından al (varsa)
       const autoPlaySpeed = theme?.components?.slider?.autoPlaySpeed || 5000;
-      
+
       slideIntervalRef.current = setInterval(() => {
         setCurrentSlide(prev => (prev + 1) % promotionSlides.length);
       }, autoPlaySpeed);
     }
-    
+
     return () => {
       if (slideIntervalRef.current) {
         clearInterval(slideIntervalRef.current);
@@ -359,18 +359,18 @@ const QrMenu = () => {
     if (!branch_id) {
       console.log("Şube ID'si belirtilmedi, varsayılan şube ürünleri getiriliyor");
       try {
-        const branchesResponse = await api.get("/api/branches");
+        const branchesResponse = await api.get("/api/branches/public"); // PUBLIC endpoint eklemeniz gerekecek
         if (branchesResponse.data && branchesResponse.data.length > 0) {
           const defaultBranchId = branchesResponse.data[0].id;
           console.log(`Varsayılan şube ID'si: ${defaultBranchId}`);
-
-          const branchResponse = await api.get(`/api/branches/${defaultBranchId}`);
+  
+          const branchResponse = await api.get(`/api/branches/public/${defaultBranchId}`);
           const defaultBranch = branchResponse.data;
-
-          const productsResponse = await api.get(`/api/branches/${defaultBranchId}/menu`);
-
+  
+          const productsResponse = await api.get(`/api/branches/public/${defaultBranchId}/menu`);
+  
           console.log("API yanıtı:", productsResponse.data);
-
+  
           if (productsResponse.data && productsResponse.data.products) {
             if (productsResponse.data.products.length > 0) {
               console.log(`${productsResponse.data.products.length} ürün başarıyla yüklendi`);
@@ -383,7 +383,7 @@ const QrMenu = () => {
             console.warn("API yanıtında products dizisi bulunamadı:", productsResponse.data);
             loadFallbackProducts();
           }
-
+  
           navigate(`/menu/${defaultBranchId}`, { replace: true });
         }
       } catch (err) {
@@ -392,17 +392,17 @@ const QrMenu = () => {
       }
       return;
     }
-
+  
     try {
       console.log(`${branch_id} ID'li şubenin menüsü getiriliyor...`);
-
-      const branchResponse = await api.get(`/api/branches/${branch_id}`);
+  
+      const branchResponse = await api.get(`/api/branches/public/${branch_id}`);
       const branch = branchResponse.data;
       console.log("Şube detayları:", branch);
-
-      const response = await api.get(`/api/branches/${branch_id}/menu`);
+  
+      const response = await api.get(`/api/branches/public/${branch_id}/menu`);
       console.log("Menü API yanıtı:", response.data);
-
+  
       if (response.data && response.data.products && response.data.products.length > 0) {
         console.log(`${response.data.products.length} ürün başarıyla yüklendi`);
         setProducts(response.data.products);
@@ -639,33 +639,45 @@ const QrMenu = () => {
     }
   }
 
+  // Medya hata yakalama ve fallback görüntü gösterme için geliştirilmiş fonksiyon
   const handleMediaError = (e, slide) => {
-    console.error("Medya yüklenemedi:", slide?.media || slide?.image);
-    
-    // SVG placeholder oluştur
+    console.error("Medya yüklenemedi:", slide?.media || slide?.image || e.target.src);
+
+    // Basit, performanslı fallback SVG base64 kodlaması
+    const fallbackBase64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiPkdvcnVudHUgQnVsdW5hbWFkaTwvdGV4dD48L3N2Zz4=';
+
+    // SVG placeholder oluştur (daha gelişmiş varyasyon için)
     const placeholderSvg = `
-      <svg width="100%" height="100%" viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="#f3f4f6"/>
-        <text x="50%" y="50%" font-size="24" text-anchor="middle" alignment-baseline="middle" font-family="Arial, sans-serif" fill="#6b7280">
-          ${slide.type === 'video' ? 'Video Gösterimi' : 'Promosyon Görseli'}
-        </text>
-      </svg>
-    `;
-    
+    <svg width="100%" height="100%" viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f3f4f6"/>
+      <text x="50%" y="50%" font-size="24" text-anchor="middle" alignment-baseline="middle" font-family="Arial, sans-serif" fill="#6b7280">
+        ${slide?.type === 'video' ? 'Video Gösterimi' : 'Promosyon Görseli'}
+      </text>
+    </svg>
+  `;
+
     const encodedSvg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeholderSvg)}`;
-    
-    if (slide.type === 'video') {
-      // Video için placeholder div oluştur
-      e.target.parentNode.innerHTML = `
-        <div class="w-full h-full flex items-center justify-center bg-gray-100">
-          <img src="${encodedSvg}" alt="Video Gösterimi" class="w-full h-full object-cover"/>
-        </div>
-      `;
-    } else {
-      // Görsel için src değiştir
-      e.target.src = encodedSvg;
+
+    try {
+      if (slide?.type === 'video') {
+        // Video için placeholder div oluştur
+        if (e.target.parentNode) {
+          e.target.parentNode.innerHTML = `
+          <div class="w-full h-full flex items-center justify-center bg-gray-100">
+            <img src="${fallbackBase64}" alt="Video Gösterimi" class="w-full h-full object-cover"/>
+          </div>
+        `;
+        }
+      } else {
+        // Görsel için src değiştir - önce basit fallback'i dene
+        e.target.src = fallbackBase64;
+      }
+    } catch (error) {
+      console.error("Fallback görüntü uygulanırken hata oluştu:", error);
+      // Son çare olarak en basit fallback'i kullan
+      e.target.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
     }
-  }
+  };
 
   const handleProductClick = (product) => {
     navigate(`/product/${product.id}`, { state: { product, branchId } });
@@ -926,11 +938,10 @@ const QrMenu = () => {
                     <button
                       key={index}
                       onClick={() => setCurrentSlide(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentSlide 
-                          ? `bg-${theme?.colors?.primary ? theme.colors.primary.replace('#', '') : 'white'} w-4` 
-                          : 'bg-white/50'
-                      }`}
+                      className={`w-2 h-2 rounded-full transition-all ${index === currentSlide
+                        ? `bg-${theme?.colors?.primary ? theme.colors.primary.replace('#', '') : 'white'} w-4`
+                        : 'bg-white/50'
+                        }`}
                       aria-label={`Slayt ${index + 1}`}
                     />
                   ))}

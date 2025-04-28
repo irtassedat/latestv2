@@ -33,6 +33,23 @@ api.interceptors.request.use(config => {
   // Orijinal URL'yi logla
   console.log('Original request URL:', config.url);
   
+  // Public endpointler için token kontrolü yapma
+  if (config.url.includes('/public/') || config.url.includes('/api/theme/public/')) {
+    console.log('Public endpoint detected, skipping token check:', config.url);
+    // URL'nin başında /api varsa bırak, yoksa ekle
+    if (!config.url.startsWith('/api/')) {
+      config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
+    }
+    console.log(`Final public request URL: ${config.baseURL}${config.url}`);
+    return config;
+  }
+  
+  // Token kontrolü
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
   // Çift /api/api hatasını düzelt
   if (config.url.includes('/api/api/')) {
     config.url = config.url.replace('/api/api/', '/api/');
