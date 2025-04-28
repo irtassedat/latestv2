@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube, FaTimes, FaUser, FaGift } from "react-icons/fa";
 
-const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
+const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout, theme }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -65,20 +65,29 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
     }
   };
 
+  // Tema renklerini ayarla
+  const headerBg = theme?.colors?.headerBg || "#022B45";
+  const headerText = theme?.colors?.headerText || "#ffffff";
+  const primaryColor = theme?.colors?.primary || "#022B45";
+  const buttonBg = theme?.colors?.buttonBg || "#D98A3D";
+
   return (
     <>
       {/* Üst Header */}
-      <header className="text-white p-6 shadow-md flex justify-between items-center bg-[#022B45] relative z-10">
+      <header 
+        className="text-white p-6 shadow-md flex justify-between items-center relative z-10"
+        style={{ backgroundColor: headerBg }}
+      >
         <div className="flex items-center">
           <button onClick={() => navigate("/menu")} className="mr-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: headerText }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-2xl font-medium">Çeşme Kahve</h1>
+          <h1 className="text-2xl font-medium" style={{ color: headerText }}>Çeşme Kahve</h1>
         </div>
         <button onClick={toggleMenu} className="p-1">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: headerText }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -184,7 +193,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                     padding: '8px',
                   }}>
                     <img 
-                      src="/logos/restlogo.png" 
+                      src={theme?.components?.logo?.url || "/logos/restlogo.png"}
                       alt="Çeşme Kahve Logo" 
                       style={{ 
                         maxWidth: '100%', 
@@ -193,7 +202,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                       }}
                       onError={(e) => {
                         e.target.style.display = 'none';
-                        e.target.parentElement.style.backgroundColor = '#022B45';
+                        e.target.parentElement.style.backgroundColor = primaryColor;
                         e.target.parentElement.style.color = 'white';
                         e.target.parentElement.innerHTML = 'ÇEŞME KAHVE';
                       }}
@@ -202,20 +211,22 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                 </div>
                 
                 {/* Sosyal Medya */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '24px',
-                  marginTop: '10px',
-                  marginBottom: '30px',
-                  color: '#022B45',
-                  fontSize: '24px',
-                }}>
-                  <FaInstagram style={{ cursor: 'pointer' }} />
-                  <FaFacebookF style={{ cursor: 'pointer' }} />
-                  <FaTwitter style={{ cursor: 'pointer' }} />
-                  <FaYoutube style={{ cursor: 'pointer' }} />
-                </div>
+                {theme?.components?.header?.showSocialMedia !== false && (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '24px',
+                    marginTop: '10px',
+                    marginBottom: '30px',
+                    color: primaryColor,
+                    fontSize: '24px',
+                  }}>
+                    <FaInstagram style={{ cursor: 'pointer' }} />
+                    <FaFacebookF style={{ cursor: 'pointer' }} />
+                    <FaTwitter style={{ cursor: 'pointer' }} />
+                    <FaYoutube style={{ cursor: 'pointer' }} />
+                  </div>
+                )}
                 
                 {/* Menü Öğeleri */}
                 <div style={{ 
@@ -228,7 +239,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: '16px',
-                    color: '#022B45',
+                    color: primaryColor,
                     fontSize: '18px',
                     fontWeight: '500',
                   }}>
@@ -294,7 +305,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                   marginTop: 'auto',
                   paddingTop: '20px',
                   borderTop: '1px solid #eee',
-                  marginBottom: '100px', // Artırıldı
+                  marginBottom: '100px',
                 }}>
                   {customer ? (
                     <div style={{ 
@@ -314,7 +325,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                           width: '40px',
                           height: '40px',
                           borderRadius: '50%',
-                          backgroundColor: '#022B45',
+                          backgroundColor: primaryColor,
                           color: 'white',
                           display: 'flex',
                           alignItems: 'center',
@@ -341,7 +352,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                           alignItems: 'center',
                           gap: '10px',
                           padding: '10px',
-                          backgroundColor: '#022B45',
+                          backgroundColor: buttonBg,
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
@@ -373,7 +384,7 @@ const CesmeHeader = ({ customer, onLoginClick, onProfileClick, onLogout }) => {
                       onClick={handleCustomerLogin}
                       style={{
                         width: '100%',
-                        backgroundColor: '#022B45',
+                        backgroundColor: primaryColor,
                         color: 'white',
                         padding: '12px',
                         borderRadius: '8px',

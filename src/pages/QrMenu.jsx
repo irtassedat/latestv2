@@ -1,4 +1,4 @@
-// src/pages/QrMenu.jsx
+// src/pages/QrMenu.jsx - Tema desteği eklenmiş hali (orijinal UI korunarak)
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useLocation, useParams } from "react-router-dom"
 import api from "../lib/axios"
@@ -43,6 +43,93 @@ const QrMenu = () => {
   const [selectedPoints, setSelectedPoints] = useState(null)
   const [discountAmount, setDiscountAmount] = useState(0)
 
+  // Tema için yeni state
+  const [theme, setTheme] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // Tema ayarlarını getir
+  useEffect(() => {
+    const fetchTheme = async () => {
+      if (!branchId) return;
+      
+      try {
+        // Önce şube tema ayarlarını kontrol et - Public endpoint kullan
+        const branchResponse = await api.get(`/api/theme/public/settings/branch/${branchId}`);
+        if (Object.keys(branchResponse.data).length > 0) {
+          setTheme(branchResponse.data);
+        } else {
+          // Şube tema ayarı yoksa marka ayarlarını kontrol et
+          const branchData = await api.get(`/api/branches/${branchId}`);
+          if (branchData.data.brand_id) {
+            const brandResponse = await api.get(`/api/theme/public/settings/brand/${branchData.data.brand_id}`);
+            if (Object.keys(brandResponse.data).length > 0) {
+              setTheme(brandResponse.data);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Tema ayarları yüklenirken hata:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTheme();
+  }, [branchId]);
+
+  // Tema CSS'ini dinamik olarak oluştur
+  useEffect(() => {
+    if (!theme) {
+      console.log('Tema verisi yok');
+      return;
+    }
+
+    console.log('Tema uygulanıyor:', theme);
+
+    const styleElement = document.createElement('style');
+    styleElement.id = 'dynamic-theme-styles';
+    
+    // Sadece seçilen tema ayarlarını override et, varsayılan değerleri koru
+    styleElement.textContent = `
+      /* Header tema override */
+      .theme-header-bg {
+        background-color: ${theme.colors?.headerBg} !important;
+      }
+      
+      .theme-header-text {
+        color: ${theme.colors?.headerText} !important;
+      }
+      
+      /* Buton tema override */
+      .theme-button-override {
+        background-color: ${theme.colors?.buttonBg} !important;
+        color: ${theme.colors?.buttonText} !important;
+      }
+      
+      /* Kategori tema override */
+      .theme-category-override {
+        background-color: ${theme.colors?.categoryBg} !important;
+        color: ${theme.colors?.categoryText} !important;
+      }
+      
+      /* Fiyat tema override */
+      .theme-price-override {
+        color: ${theme.colors?.priceColor} !important;
+      }
+    `;
+
+    document.head.appendChild(styleElement);
+    console.log('Tema CSS eklendi');
+
+    return () => {
+      const element = document.getElementById('dynamic-theme-styles');
+      if (element) {
+        document.head.removeChild(element);
+        console.log('Tema CSS kaldırıldı');
+      }
+    };
+  }, [theme]);
+
   // Sayfa yüklendiğinde müşteri kontrolü
   useEffect(() => {
     const savedCustomer = localStorage.getItem('customer_data')
@@ -77,8 +164,8 @@ const QrMenu = () => {
     return subtotal - discountAmount
   }
 
-  // Promosyon slider verileri
-  const promotionSlides = [
+  // Promosyon slider verileri - tema ayarlarından al ama varsayılanları koru
+  const promotionSlides = theme?.components?.slider?.slides || [
     {
       id: 1,
       image: "/uploads/dere-otlu-pogaca-slider.png"
@@ -87,7 +174,7 @@ const QrMenu = () => {
       id: 2,
       image: "/uploads/dere-otlu-pogaca-slider.png"
     }
-  ]
+  ];
 
   // Slider boyutlarını hesapla
   useEffect(() => {
@@ -620,6 +707,7 @@ const QrMenu = () => {
           setCustomer(null);
           setLoyaltyData(null);
         }}
+        theme={theme}
       />
     </div>
   )
@@ -627,7 +715,7 @@ const QrMenu = () => {
   return (
     <div className="min-h-screen bg-gray-100 pt-20" ref={containerRef}>
       <div
-        className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[#1a9c95]/90 transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
+        className={`fixed top-0 left-0 w-full z-50 backdrop-blur-md ${theme ? 'theme-header-bg' : 'bg-[#1a9c95]/90'} transition-all duration-500 ease-in-out transform ${showHeader ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full'}`}
       >
         {renderHeader()}
       </div>
@@ -648,7 +736,7 @@ const QrMenu = () => {
                   className={`px-3 py-1.5 text-sm font-normal whitespace-nowrap transition-all rounded border
                     ${activeCategory === cat
                       ? 'bg-white border-white text-[#022B45]'
-                      : 'bg-[#022B45] text-white border-[#022B45] hover:opacity-90'
+                      : `${theme ? 'theme-category-override' : 'bg-[#022B45] text-white border-[#022B45]'} hover:opacity-90`
                     }`}
                 >
                   {cat.toUpperCase()}
@@ -750,7 +838,7 @@ const QrMenu = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold">{p.name}</h3>
-                    <p className="text-[#D98A3D] font-bold text-base mb-1">{p.price} ₺</p>
+                    <p className={`font-bold text-base mb-1 ${theme ? 'theme-price-override' : 'text-[#D98A3D]'}`}>{p.price} ₺</p>
                   </div>
                 </div>
               ))}
@@ -848,7 +936,7 @@ const QrMenu = () => {
                           e.stopPropagation();
                           addToCart(p);
                         }}
-                        className="absolute bottom-1 right-1 bg-[#022B45]/80 text-white rounded-full p-1.5 backdrop-blur-sm hover:bg-[#022B45] transition-colors"
+                        className={`absolute bottom-1 right-1 ${theme ? 'theme-button-override' : 'bg-[#022B45]/80 text-white'} rounded-full p-1.5 backdrop-blur-sm hover:bg-[#022B45] transition-colors`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -858,7 +946,7 @@ const QrMenu = () => {
 
                     <div className="flex-1 pl-2 group-hover:transform group-hover:translate-y-[-2px] transition-transform duration-300">
                       <h3 className="text-base font-semibold mb-1">{p.name}</h3>
-                      <p className="text-[#D98A3D] font-bold text-base mb-1">{p.price} ₺</p>
+                      <p className={`font-bold text-base mb-1 ${theme ? 'theme-price-override' : 'text-[#D98A3D]'}`}>{p.price} ₺</p>
 
                       {p.description && (
                         <p className="text-sm text-gray-600 line-clamp-2 mb-2">{p.description}</p>
@@ -998,7 +1086,7 @@ const QrMenu = () => {
                       </div>
                       <div>
                         <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-[#D98A3D]">{item.price} ₺</p>
+                        <p className={`text-sm ${theme ? 'theme-price-override' : 'text-[#D98A3D]'}`}>{item.price} ₺</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1094,7 +1182,7 @@ const QrMenu = () => {
 
                 <div className="flex justify-between items-center py-3 border-t">
                   <span className="font-medium">Toplam</span>
-                  <span className="text-lg font-bold text-[#D98A3D]">
+                  <span className={`text-lg font-bold ${theme ? 'theme-price-override' : 'text-[#D98A3D]'}`}>
                     {calculateDiscountedTotal().toFixed(2)} ₺
                   </span>
                 </div>
@@ -1102,7 +1190,7 @@ const QrMenu = () => {
                 {/* Siparişi tamamla butonu */}
                 <div className="flex flex-col gap-2 mt-6">
                   <button
-                    className="w-full bg-[#022B45] text-white py-3 rounded-lg font-medium hover:bg-[#022B45]/80 transition-colors"
+                    className={`w-full py-3 rounded-lg font-medium transition-colors ${theme ? 'theme-button-override' : 'bg-[#022B45] text-white hover:bg-[#022B45]/80'}`}
                     onClick={handleCompleteOrder}
                   >
                     Siparişi Tamamla

@@ -1,7 +1,8 @@
-// src/layout/MainLayout.jsx - Improved Navigation
+// src/layout/MainLayout.jsx - Tema menüsü eklenmiş hali
 import { useState, useEffect, createContext } from "react"
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom"
 import { FiGift, FiStar, FiActivity } from "react-icons/fi"
+import { MdPalette } from "react-icons/md"
 import { useAuth } from "../contexts/AuthContext"
 import { FiLogOut, FiUser, FiBriefcase, FiLayers, FiBarChart2, FiUsers, FiHome, FiPackage, FiShoppingBag, FiFileText, FiSmartphone, FiTrendingUp, FiMap, FiSettings, FiMenu, FiX } from "react-icons/fi"
 import api from "../lib/axios"
@@ -32,6 +33,8 @@ const MainLayout = () => {
       setExpandedGroup('branches');
     } else if (location.pathname.includes('/loyalty')) {
       setExpandedGroup('loyalty');
+    } else if (location.pathname.includes('/theme')) {
+      setExpandedGroup('theme');
     }
   }, [location.pathname]);
 
@@ -125,7 +128,6 @@ const MainLayout = () => {
         icon: <FiBriefcase size={20} />,
         items: [
           { path: "/admin/brands", label: "Tüm Markalar", icon: <FiBriefcase size={18} /> },
-          // Burada dinamik olarak son ziyaret edilen markaları gösterebilirsiniz
         ]
       });
       
@@ -146,23 +148,17 @@ const MainLayout = () => {
         icon: <FiMap size={20} />,
         items: [
           { path: "/admin/branches", label: "Tüm Şubeler", icon: <FiMap size={18} /> },
-          // Burada dinamik olarak son ziyaret edilen şubeleri gösterebilirsiniz
         ]
       });
       
-      // Sadakat Programı Grubu
+      // Tema Yönetimi Grubu (YENİ EKLENEN)
       menuGroups.push({
-        id: "loyalty",
-        label: "Sadakat Programı",
-        icon: <FiStar size={20} />,
+        id: "theme",
+        label: "Tema Yönetimi",
+        icon: <MdPalette size={20} />,
         items: [
-          { path: "/admin/loyalty", label: "Dashboard", icon: <FiStar size={18} /> },
-          { path: "/admin/loyalty/campaigns", label: "Kampanyalar", icon: <FiGift size={18} /> },
-          { path: "/admin/loyalty/customers", label: "Müşteriler", icon: <FiUsers size={18} /> },
-          { path: "/admin/loyalty/rewards", label: "Ödül Yönetimi", icon: <FiPackage size={18} /> }, // YENİ EKLENEN
-          { path: "/admin/loyalty/points/manual", label: "Manuel İşlem", icon: <FiActivity size={18} /> },
-          { path: "/admin/loyalty/reports", label: "Raporlar", icon: <FiBarChart2 size={18} /> },
-          { path: "/admin/loyalty/settings", label: "Ayarlar", icon: <FiSettings size={18} /> },
+          { path: `/admin/theme/brand/${currentUser?.brand_id || 1}`, label: "Marka Teması", icon: <MdPalette size={18} /> },
+          { path: "/admin/theme/branches", label: "Şube Temaları", icon: <MdPalette size={18} /> },
         ]
       });
       
@@ -177,7 +173,35 @@ const MainLayout = () => {
       });
     }
     
-    // Başka gruplar eklenebilir
+    // Branch Manager için tema yönetimi
+    if (isBranchManager && currentUser?.branch_id) {
+      menuGroups.push({
+        id: "theme",
+        label: "Tema Yönetimi",
+        icon: <MdPalette size={20} />,
+        items: [
+          { path: `/admin/theme/branch/${currentUser.branch_id}`, label: "Şube Teması", icon: <MdPalette size={18} /> },
+        ]
+      });
+    }
+    
+    // Sadakat Programı Grubu - Sadece Super Admin için
+    if (isSuperAdmin) {
+      menuGroups.push({
+        id: "loyalty",
+        label: "Sadakat Programı",
+        icon: <FiStar size={20} />,
+        items: [
+          { path: "/admin/loyalty", label: "Dashboard", icon: <FiStar size={18} /> },
+          { path: "/admin/loyalty/campaigns", label: "Kampanyalar", icon: <FiGift size={18} /> },
+          { path: "/admin/loyalty/customers", label: "Müşteriler", icon: <FiUsers size={18} /> },
+          { path: "/admin/loyalty/rewards", label: "Ödül Yönetimi", icon: <FiPackage size={18} /> },
+          { path: "/admin/loyalty/points/manual", label: "Manuel İşlem", icon: <FiActivity size={18} /> },
+          { path: "/admin/loyalty/reports", label: "Raporlar", icon: <FiBarChart2 size={18} /> },
+          { path: "/admin/loyalty/settings", label: "Ayarlar", icon: <FiSettings size={18} /> },
+        ]
+      });
+    }
     
     // Diğer Menü Öğeleri - Hem Super Admin hem de Branch Manager için
     const sharedItems = [
