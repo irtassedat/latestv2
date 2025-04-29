@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import {
   FiEdit2, FiTrash2, FiPlus, FiInfo, FiSettings, FiCheck,
   FiX, FiUpload, FiDownload, FiEye, FiEyeOff, FiPackage, FiCopy,
-  FiGrid, FiList
+  FiGrid, FiList, FiChevronDown, FiChevronRight, FiLink
 } from "react-icons/fi";
 import { HiOutlineDocumentSearch } from "react-icons/hi";
-import { FiLink } from 'react-icons/fi';
 import { MdLinkOff } from 'react-icons/md';
+import React from "react";
 import api from "../lib/axios";
 import toast from "react-hot-toast";
 import { Tab } from '@headlessui/react';
@@ -65,6 +65,10 @@ const EnhancedTemplateManager = () => {
   const [productCategoryFilter, setProductCategoryFilter] = useState("");
   const [productLoading, setProductLoading] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+
+  // Kategori bazlı görünürlük ayarları için yeni state
+  const [expandedCategories, setExpandedCategories] = useState([]);
 
   // Excel import için dosya referansı
   const fileInputRef = useRef(null);
@@ -106,7 +110,6 @@ const EnhancedTemplateManager = () => {
   const [copyStep, setCopyStep] = useState(0);
   const [newTemplateInfo, setNewTemplateInfo] = useState(null);
   const [copyResults, setCopyResults] = useState(null);
-
   // LocalStorage'dan görünüm tercihini yükle
   useEffect(() => {
     const savedViewMode = localStorage.getItem('templateManagerViewMode');
@@ -114,6 +117,27 @@ const EnhancedTemplateManager = () => {
       setViewMode(savedViewMode);
     }
   }, []);
+
+  // Seçili ürünler değiştiğinde sabit çubuğu göster/gizle
+  useEffect(() => {
+    const fixedBar = document.getElementById('fixed-action-bar');
+    if (fixedBar) {
+      if (selectedProducts.length > 0) {
+        fixedBar.classList.remove('hidden');
+        fixedBar.classList.add('flex');
+      } else {
+        fixedBar.classList.add('hidden');
+        fixedBar.classList.remove('flex');
+      }
+    }
+
+    // Eğer sayfadan ayrılırken seçim varsa temizle
+    return () => {
+      if (selectedProducts.length > 0) {
+        setSelectedProducts([]);
+      }
+    };
+  }, [selectedProducts]);
 
   // Görünüm tercihini kaydet
   const handleViewModeChange = (mode) => {
@@ -172,6 +196,52 @@ const EnhancedTemplateManager = () => {
     fetchCategories();
   }, []);
 
+  // Kategori açılıp kapanmasını kontrol eder
+  const toggleCategoryExpand = (categoryId) => {
+    if (expandedCategories.includes(categoryId)) {
+      setExpandedCategories(expandedCategories.filter(id => id !== categoryId));
+    } else {
+      setExpandedCategories([...expandedCategories, categoryId]);
+    }
+  };
+
+  // Kategori bazlı görünürlük değiştirme
+  const handleCategoryVisibilityToggle = async (categoryId, makeVisible) => {
+    try {
+      // Bu kategorideki tüm ürünleri bul
+      const categoryProducts = filteredTemplateProducts.filter(
+        product => product.category_id?.toString() === categoryId.toString()
+      );
+
+      if (categoryProducts.length === 0) {
+        toast.warning("Bu kategoride ürün bulunamadı");
+        return;
+      }
+      const productIds = categoryProducts.map(product => product.id);
+
+      // API için istek hazırla
+      const productUpdates = productIds.map(productId => ({
+        product_id: productId,
+        is_visible: makeVisible
+      }));
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+      // UI'ı güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          productIds.includes(product.id)
+            ? { ...product, is_visible: makeVisible }
+            : product
+        )
+      );
+      toast.success(`${categoryProducts.length} ürünün görünürlüğü değiştirildi`);
+    } catch (error) {
+      console.error("Kategori görünürlüğü güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
   const handleInitiateCopy = async (template, type) => {
     try {
       setCopyLoading(true);
@@ -273,6 +343,86 @@ const EnhancedTemplateManager = () => {
       toast.error("Kopyalama bilgileri alınamadı");
     } finally {
       setCopyLoading(false);
+    }
+  };
+
+  // Ürün seçimini açıp kapatan fonksiyon
+  const toggleProductSelection = (productId) => {
+    setSelectedProducts(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  // Seçili ürünleri görünür yapma fonksiyonu
+  const makeSelectedProductsVisible = async () => {
+    try {
+      if (selectedProducts.length === 0) {
+        toast.warning("Lütfen önce ürün seçin");
+        return;
+      }
+
+      const productUpdates = selectedProducts.map(productId => ({
+        product_id: productId,
+        is_visible: true
+      }));
+
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // UI'ı güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          selectedProducts.includes(product.id)
+            ? { ...product, is_visible: true }
+            : product
+        )
+      );
+
+      toast.success(`${selectedProducts.length} ürün görünür yapıldı`);
+      setSelectedProducts([]); // Seçimi temizle
+
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+  // Seçili ürünleri görünmez yapma fonksiyonu - Düzeltilmiş
+  const makeSelectedProductsInvisible = async () => {
+    try {
+      if (selectedProducts.length === 0) {
+        toast.warning("Lütfen önce ürün seçin");
+        return;
+      }
+
+      const productUpdates = selectedProducts.map(productId => ({
+        product_id: productId,
+        is_visible: false
+      }));
+
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // UI'ı güncelle - sadece seçili ürünlerin görünürlüğünü değiştir
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          selectedProducts.includes(product.id)
+            ? { ...product, is_visible: false }
+            : product
+        )
+      );
+
+      toast.success(`${selectedProducts.length} ürün gizlendi`);
+      setSelectedProducts([]); // Seçimi temizle
+
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
     }
   };
 
@@ -438,7 +588,6 @@ const EnhancedTemplateManager = () => {
       setCopyLoading(false);
     }
   };
-
   // Form değişikliklerini izle
   const handleMenuFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -589,7 +738,6 @@ const EnhancedTemplateManager = () => {
       toast.error("İşlem başarısız oldu!");
     }
   };
-
   // Entegrasyon formu gönderimi
   const handleIntegrationSubmit = async (e) => {
     e.preventDefault();
@@ -689,7 +837,6 @@ const EnhancedTemplateManager = () => {
       setProductLoading(false);
     }
   };
-
   // Menü şablonundaki ürünleri yönetme fonksiyonu
   const handleManageMenuProducts = async (templateId) => {
     setProductLoading(true);
@@ -707,6 +854,12 @@ const EnhancedTemplateManager = () => {
       setTemplateProducts(response.data);
       setCurrentTemplateId(templateId);
       setShowProductsModal(true);
+
+      // İlk birkaç kategoriyi başlangıçta açalım (maksimum 3)
+      const uniqueCategories = [...new Set(response.data.map(p => p.category_id?.toString()).filter(Boolean))];
+      const categoriesToExpand = uniqueCategories.slice(0, 3);
+      setExpandedCategories(categoriesToExpand);
+
     } catch (error) {
       console.error("Şablon ürünleri yüklenirken hata:", error);
       console.error("Hata detayları:", error.response?.data || "Detay yok");
@@ -784,7 +937,6 @@ const EnhancedTemplateManager = () => {
       setProductLoading(false);
     }
   };
-
   // Ürün görünürlüğünü güncelle - Menü şablonu için
   const handleProductVisibilityToggle = async (productId, isVisible) => {
     try {
@@ -957,7 +1109,6 @@ const EnhancedTemplateManager = () => {
       }
     }
   };
-
   // Excel export fonksiyonu - Menü şablonu için
   const handleMenuTemplateExcelExport = () => {
     if (!currentTemplateId || templateProducts.length === 0) {
@@ -1097,7 +1248,6 @@ const EnhancedTemplateManager = () => {
 
     toast.success("Excel dosyası indiriliyor...");
   };
-
   // Ürünleri filtrele - Menü şablonu için
   const filteredTemplateProducts = templateProducts.filter(product => {
     return (
@@ -1106,6 +1256,23 @@ const EnhancedTemplateManager = () => {
       (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
     );
   });
+
+  // Kategorilere göre grupla
+  const productsByCategory = filteredTemplateProducts.reduce((acc, product) => {
+    const categoryId = product.category_id?.toString() || "undefined";
+    const categoryName = product.category_name || "Kategorisiz";
+
+    if (!acc[categoryId]) {
+      acc[categoryId] = {
+        id: categoryId,
+        name: categoryName,
+        products: []
+      };
+    }
+
+    acc[categoryId].products.push(product);
+    return acc;
+  }, {});
 
   // Ürünleri filtrele - Fiyat şablonu için
   const filteredTemplatePriceProducts = templatePriceProducts.filter(product => {
@@ -1178,7 +1345,6 @@ const EnhancedTemplateManager = () => {
     const index = templateId % backgrounds.length;
     return backgrounds[index] || backgrounds[0];
   };
-
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -1210,8 +1376,7 @@ const EnhancedTemplateManager = () => {
             <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: "rgba(2, 43, 69, 0.2)" }}>
               <button
                 onClick={() => handleViewModeChange("grid")}
-                className={`px-3 py-2 flex items-center gap-1 ${viewMode === "grid" ? "bg-[#022B45] text-white" : ""}`}
-                title="Kart Görünümü"
+                className={`px-3 py-2 flex items-center gap-1 ${viewMode === "grid" ? "bg-[#022B45] text-white" : ""}`} title="Kart Görünümü"
               >
                 <FiGrid size={16} />
                 <span className="text-sm">Kart</span>
@@ -1375,7 +1540,6 @@ const EnhancedTemplateManager = () => {
                             </button>
                           </div>
                         </div>
-
                         {/* Menü İçeriği */}
                         <div className="p-5 flex-grow flex flex-col justify-between bg-white">
                           <div className="space-y-3">
@@ -1491,7 +1655,6 @@ const EnhancedTemplateManager = () => {
                   </div>
                 )}
               </Tab.Panel>
-
               {/* Fiyat Şablonları Panel */}
               <Tab.Panel>
                 <div className="flex justify-end mb-4">
@@ -1600,7 +1763,6 @@ const EnhancedTemplateManager = () => {
                             </button>
                           </div>
                         </div>
-
                         {/* Fiyat Şablonu İçeriği */}
                         <div className="p-5 flex-grow flex flex-col justify-between bg-white h-[200px]">
                           <div className="space-y-3 overflow-hidden flex-grow">
@@ -1747,7 +1909,6 @@ const EnhancedTemplateManager = () => {
                   </div>
                 )}
               </Tab.Panel>
-
               {/* Entegrasyon Şablonları Panel */}
               <Tab.Panel>
                 <div className="flex justify-end mb-4">
@@ -2020,7 +2181,6 @@ const EnhancedTemplateManager = () => {
                   ✕
                 </button>
               </div>
-
               <form onSubmit={handleSubmit} className="p-6">
                 {currentType === templateTypes.MENU ? (
                   /* Menü Şablonu Formu */
@@ -2229,7 +2389,6 @@ const EnhancedTemplateManager = () => {
             </div>
           </div>
         )}
-
         {/* Entegrasyon Şablonu Modalı */}
         {showIntegrationModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -2257,7 +2416,6 @@ const EnhancedTemplateManager = () => {
                   ✕
                 </button>
               </div>
-
               <form onSubmit={handleIntegrationSubmit} className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
@@ -2419,7 +2577,6 @@ const EnhancedTemplateManager = () => {
             </div>
           </div>
         )}
-
         {/* Menü Şablonu Ürün Yönetimi Modalı */}
         {showProductsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -2516,8 +2673,7 @@ const EnhancedTemplateManager = () => {
                     ))}
                   </select>
                 </div>
-
-                {/* Ürün Listesi */}
+                {/* Ürün Listesi - Burada kategori bazlı gösterimi yaptık */}
                 {productLoading ? (
                   <div className="flex items-center justify-center h-64">
                     <div
@@ -2546,6 +2702,20 @@ const EnhancedTemplateManager = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left">
+                            <input
+                              type="checkbox"
+                              onChange={() => {
+                                if (selectedProducts.length === filteredTemplateProducts.length) {
+                                  setSelectedProducts([]);
+                                } else {
+                                  setSelectedProducts(filteredTemplateProducts.map(p => p.id));
+                                }
+                              }}
+                              checked={selectedProducts.length > 0 && selectedProducts.length === filteredTemplateProducts.length}
+                              className="rounded text-blue-600"
+                            />
+                          </th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
                           <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 border-b">Görünür</th>
@@ -2553,78 +2723,149 @@ const EnhancedTemplateManager = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredTemplateProducts.map(product => (
-                          <tr key={product.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 border-b">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
-                                  {product.image_url ? (
-                                    <img
-                                      src={product.image_url}
-                                      alt={product.name}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = "/uploads/guncellenecek.jpg";
-                                      }}
-                                    />
+                        {/* Kategorilere göre gruplandırılmış ürünleri göster */}
+                        {Object.values(productsByCategory).map(category => (
+                          <React.Fragment key={category.id}>
+                            <tr className="bg-gray-100">
+                              <td colSpan="5" className="px-4 py-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => toggleCategoryExpand(category.id)}
+                                      className="p-1 rounded-full hover:bg-gray-200"
+                                    >
+                                      {expandedCategories.includes(category.id) ? (
+                                        <FiChevronDown size={18} />
+                                      ) : (
+                                        <FiChevronRight size={18} />
+                                      )}
+                                    </button>
+                                    <span className="font-medium">{category.name} ({category.products.length})</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => handleCategoryVisibilityToggle(category.id, true)}
+                                      className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                                    >
+                                      <FiEye className="inline mr-1" size={12} /> Tümünü Göster
+                                    </button>
+                                    <button
+                                      onClick={() => handleCategoryVisibilityToggle(category.id, false)}
+                                      className="px-2 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
+                                    >
+                                      <FiEyeOff className="inline mr-1" size={12} /> Tümünü Gizle
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                            {expandedCategories.includes(category.id) && category.products.map(product => (
+                              <tr key={product.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 border-b">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedProducts.includes(product.id)}
+                                    onChange={() => toggleProductSelection(product.id)}
+                                    className="rounded text-blue-600"
+                                  />
+                                </td>
+                                <td className="px-4 py-3 border-b">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                      {product.image_url ? (
+                                        <img
+                                          src={product.image_url}
+                                          alt={product.name}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = "/uploads/guncellenecek.jpg";
+                                          }}
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                          No Image
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium">{product.name}</div>
+                                      {product.description && (
+                                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                          {product.description}
+                                        </div>)}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 border-b">
+                                  {product.category_name ? (
+                                    <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                      {product.category_name}
+                                    </span>
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
-                                      No Image
-                                    </div>
+                                    <span className="text-gray-400 text-sm">-</span>
                                   )}
-                                </div>
-                                <div>
-                                  <div className="font-medium">{product.name}</div>
-                                  {product.description && (
-                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                      {product.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 border-b">
-                              {product.category_name ? (
-                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                  {product.category_name}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 border-b text-center">
-                              <button
-                                onClick={() => handleProductVisibilityToggle(product.id, product.is_visible)}
-                                className={`p-1.5 rounded-full transition-colors ${product.is_visible
-                                  ? "bg-green-100 text-green-600 hover:bg-green-200"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                  }`}
-                                title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
-                              >
-                                {product.is_visible ? <FiEye size={18} /> : <FiEyeOff size={18} />}
-                              </button>
-                            </td>
-                            <td className="px-4 py-3 border-b text-right font-medium">
-                              {product.price} ₺
-                            </td>
-                          </tr>
+                                </td>
+                                <td className="px-4 py-3 border-b text-center">
+                                  <button
+                                    onClick={() => handleProductVisibilityToggle(product.id, product.is_visible)}
+                                    className={`p-1.5 rounded-full transition-colors ${product.is_visible
+                                      ? "bg-green-100 text-green-600 hover:bg-green-200"
+                                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                      }`}
+                                    title={product.is_visible ? "Görünür - Gizle" : "Gizli - Göster"}
+                                  >
+                                    {product.is_visible ? <FiEye size={18} /> : <FiEyeOff size={18} />}
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 border-b text-right font-medium">
+                                  {product.price} ₺
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 )}
-
-                {/* Tümünü Görünür Yap Butonu - Tablodan sonra ayrı bir kontrol olarak */}
+                {/* Toplu işlem butonları */}
                 {filteredTemplateProducts.length > 0 && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={handleMakeAllVisible}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                    >
-                      <FiEye className="inline mr-2" size={16} />
-                      Tümünü Görünür Yap
-                    </button>
+                  <div className="mt-4 flex justify-between items-center">
+                    <div>
+                      {selectedProducts.length > 0 && (
+                        <span className="text-sm text-gray-600">
+                          {selectedProducts.length} ürün seçildi
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {selectedProducts.length > 0 && (
+                        <>
+                          <button
+                            onClick={makeSelectedProductsVisible}
+                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                          >
+                            <FiEye className="inline mr-2" size={16} />
+                            Seçilileri Görünür Yap
+                          </button>
+                          <button
+                            onClick={makeSelectedProductsInvisible}
+                            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                          >
+                            <FiEyeOff className="inline mr-2" size={16} />
+                            Seçilileri Gizle
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={handleMakeAllVisible}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      >
+                        <FiEye className="inline mr-2" size={16} />
+                        Tümünü Görünür Yap
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2651,10 +2892,32 @@ const EnhancedTemplateManager = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Sabit Araç Çubuğu - ID atandı ve hidden sınıfı eklendi */}
+              <div id="fixed-action-bar" className="fixed bottom-4 left-0 right-0 bg-white shadow-lg rounded-lg p-3 mx-auto max-w-2xl hidden justify-between items-center z-50 border border-gray-200">
+                <div>
+                  <span className="text-sm font-medium text-gray-600">
+                    {selectedProducts.length} ürün seçildi
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={makeSelectedProductsVisible}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
+                  >
+                    <FiEye className="inline mr-1" size={14} /> Görünür Yap
+                  </button>
+                  <button
+                    onClick={makeSelectedProductsInvisible}
+                    className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
+                  >
+                    <FiEyeOff className="inline mr-1" size={14} /> Gizle
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
-
         {/* Fiyat Şablonu Ürün Fiyatları Modalı */}
         {showPriceProductsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -2853,7 +3116,6 @@ const EnhancedTemplateManager = () => {
                     </table>
                   </div>
                 )}
-
                 {/* Bilgi Notu */}
                 <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
                   <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
@@ -2946,7 +3208,296 @@ const EnhancedTemplateManager = () => {
             </div>
           </div>
         )}
+        {/* Fiyat Şablonu Ürün Fiyatları Modalı */}
+        {showPriceProductsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+            >
+              <div
+                className="flex justify-between items-center p-4"
+                style={{ borderBottom: `1px solid ${theme.secondary}` }}
+              >
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: theme.primary }}
+                >
+                  Fiyat Şablonu Yönetimi
+                </h3>
+                <button
+                  onClick={() => setShowPriceProductsModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
 
+              <div className="p-6">
+                {/* Menü şablonu bilgisi */}
+                {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id && (
+                  <div className="mb-4 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <FiLink className="text-blue-600" size={20} />
+                    <div>
+                      <p className="text-blue-700 font-medium">
+                        Bu fiyat şablonu {getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)} şablonuna bağlı
+                      </p>
+                      <p className="text-sm text-blue-600">
+                        Sadece bu menü şablonunda bulunan ürünler listelenmektedir
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Excel Import/Export Butonları */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <input
+                    type="file"
+                    ref={priceFileInputRef}
+                    onChange={handlePriceTemplateExcelImport}
+                    accept=".xlsx, .xls"
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    onClick={() => priceFileInputRef.current.click()}
+                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={productLoading}
+                  >
+                    <FiUpload size={16} />
+                    <span>Excel'den Fiyat İçe Aktar</span>
+                  </button>
+
+                  <button
+                    onClick={handlePriceTemplateExcelExport}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={productLoading || templatePriceProducts.length === 0}
+                  >
+                    <FiDownload size={16} />
+                    <span>Fiyatları Excel'e Aktar</span>
+                  </button>
+                </div>
+
+                {/* Filtre ve Arama */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      placeholder="Ürün ara..."
+                      value={productFilter}
+                      onChange={e => setProductFilter(e.target.value)}
+                      className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
+                    />
+                    <HiOutlineDocumentSearch className="absolute left-2 top-2.5 text-gray-400" size={20} />
+                  </div>
+
+                  <select
+                    value={productCategoryFilter}
+                    onChange={e => setProductCategoryFilter(e.target.value)}
+                    className="p-2 border border-gray-300 rounded-lg focus:outline-none"
+                  >
+                    <option value="">Tüm Kategoriler</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id.toString()}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ürün Fiyat Listesi */}
+                {productLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : filteredTemplatePriceProducts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-12 w-12 mx-auto mb-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-2">Ürün Bulunamadı</h3>
+                    <p className="text-gray-500 mb-4">Ürün fiyatı bulunamadı veya filtrelere uygun ürün yok.</p>
+                    <p className="text-sm text-gray-400">Excel ile fiyat ekleyebilir veya filtrelerinizi değiştirebilirsiniz.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Ürün</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 border-b">Kategori</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Normal Fiyat</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 border-b">Şablon Fiyatı</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTemplatePriceProducts.map(product => (
+                          <tr key={product.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded overflow-hidden">
+                                  {product.image_url ? (
+                                    <img
+                                      src={product.image_url}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = "/uploads/guncellenecek.jpg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-500 text-xs">
+                                      No Image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                      {product.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              {product.category_name ? (
+                                <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  {product.category_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 border-b text-right font-medium text-gray-500">
+                              {product.price} ₺
+                            </td>
+                            <td className="px-4 py-3 border-b">
+                              <div className="flex items-center justify-end">
+                                <input
+                                  type="number"
+                                  className="w-24 p-1 text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  value={product.template_price || product.price}
+                                  min="0"
+                                  step="0.01"
+                                  onChange={(e) => handlePriceUpdate(product.id, e.target.value)}
+                                  onBlur={(e) => {
+                                    // Boş değer veya 0 ise gerçek fiyatı kullan
+                                    if (!e.target.value || parseFloat(e.target.value) <= 0) {
+                                      handlePriceUpdate(product.id, product.price);
+                                    }
+                                  }}
+                                />
+                                <span className="ml-2 text-gray-700">₺</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {/* Bilgi Notu */}
+                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                  <h4 className="text-sm font-medium text-amber-700 mb-1 flex items-center gap-1">
+                    <FiInfo size={16} />
+                    <span>Fiyat Şablonu Hakkında</span>
+                  </h4>
+                  <p className="text-sm text-amber-600">
+                    {templates.price.find(t => t.id === currentTemplateId)?.menu_template_id
+                      ? `Bu fiyat şablonu, seçili "${getTemplateName('menu', templates.price.find(t => t.id === currentTemplateId)?.menu_template_id)}" menü şablonundaki ürünler için fiyat belirlemenizi sağlar.`
+                      : "Fiyat şablonunu bir menü şablonuna bağlarsanız, sadece o menüdeki ürünler için fiyat belirleyebilirsiniz. Bu sayede daha kontrollü fiyatlandırma yapabilirsiniz."
+                    }
+                  </p>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowPriceProductsModal(false)}
+                    className="px-4 py-2 text-white rounded-lg"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Silme Onay Modalı */}
+        {confirmDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+              style={{ boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)" }}
+            >
+              <div className="text-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-12 w-12 mx-auto mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  style={{ color: theme.danger }}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+
+                <h3
+                  className="text-xl font-semibold mb-2"
+                  style={{ color: theme.primary }}
+                >
+                  Şablonu Sil
+                </h3>
+                <p
+                  className="mb-6"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Bu şablonu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve şablonu kullanan şubeler etkilenebilir.
+                </p>
+
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => setConfirmDelete(null)}
+                    className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                    style={{
+                      borderColor: theme.secondary,
+                      color: theme.primary,
+                      fontWeight: 600
+                    }}
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={() => handleDelete(confirmDelete.id, confirmDelete.type)}
+                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors"
+                    style={{
+                      backgroundColor: theme.danger,
+                      fontWeight: 600
+                    }}
+                  >
+                    Evet, Sil
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Şablon Kopyalama Modalı */}
         {copyingTemplate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -3004,7 +3555,6 @@ const EnhancedTemplateManager = () => {
                               <span className="text-gray-600">Görünür Ürün</span>
                               <span className="font-medium">{copyDetails.visibleItems} / {copyDetails.items}</span>
                             </div>
-
                             <div className="flex items-center justify-between mb-1 pb-1 border-b border-gray-200">
                               <div className="flex items-center gap-2">
                                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#D98A3D]" fill="currentColor">
@@ -3083,7 +3633,6 @@ const EnhancedTemplateManager = () => {
                                 )}
                               </div>
                             )}
-
                             {copyDetails.linkedMenu && (
                               <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
                                 <div className="flex items-center text-sm text-blue-700">
@@ -3181,7 +3730,6 @@ const EnhancedTemplateManager = () => {
                       </div>
                     )}
                   </div>
-
                   {/* Bilgilendirme kutusu */}
                   <div className="bg-blue-50 p-4 rounded-lg mb-6">
                     <div className="flex gap-3 mb-2">
@@ -3274,7 +3822,6 @@ const EnhancedTemplateManager = () => {
                                 )}
                               </>
                             )}
-
                             {copyingTemplate.type === templateTypes.INTEGRATION && (
                               <li>
                                 Entegrasyon türü ve ayarları aynen kopyalanacak
@@ -3380,7 +3927,6 @@ const EnhancedTemplateManager = () => {
                         <FiEdit2 size={16} />
                         <span>Yeni Şablonu Düzenle</span>
                       </button>
-
                       {copyingTemplate.type === templateTypes.MENU && (
                         <button
                           onClick={() => {
@@ -3510,3 +4056,4 @@ const EnhancedTemplateManager = () => {
 };
 
 export default EnhancedTemplateManager;
+
