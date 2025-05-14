@@ -1,0 +1,189 @@
+// src/pages/QrMenu.jsx - Tema desteği ve medya işleme geliştirmeleri ile
+import { useEffect, useRef, useState } from "react"
+import { useNavigate, useLocation, useParams } from "react-router-dom"
+import api from "../lib/axios"
+import toast from "react-hot-toast"
+import CesmeHeader from "../components/CesmeHeader"
+import CustomerLogin from "../components/CustomerLogin"
+import LoyaltyProfile from "../components/LoyaltyProfile"
+import LoyaltyPointsModal from "../components/LoyaltyPointsModal"
+import { 
+  getCategoryImageUrl, 
+  refreshCategoryImages,
+  setupCategoryImageListener 
+} from "../utils/categoryImageHelper"
+
+// QrMenu bileşenin başlangıcı...
+const QrMenu = () => {
+  // Mevcut state tanımları...
+  
+  // Kategori image_url'ini tutacak obje
+  const [categoryImages, setCategoryImages] = useState({})
+  
+  // Component mount edildiğinde kategori resim dinleyicisini etkinleştir
+  useEffect(() => {
+    // Kategori resim güncellemelerini dinle
+    setupCategoryImageListener();
+    
+    // Sayfa yüklendiğinde localStorage'dan kategori güncellemelerini kontrol et
+    const checkCategoryUpdates = () => {
+      const categoryUpdated = localStorage.getItem('category_updated');
+      if (categoryUpdated) {
+        console.log("Kategori güncellemesi tespit edildi, kategoriler yeniden yükleniyor...");
+        
+        // Yeni kategori verilerini getir
+        fetchCategories();
+        
+        // 1 saniye sonra tüm kategori resimlerini güncelle
+        setTimeout(() => {
+          refreshCategoryImages();
+        }, 1000);
+      }
+    };
+    
+    checkCategoryUpdates();
+    
+    // Kategorileri getir
+    fetchCategories();
+    
+    // Sayfa görünür olduğunda kontrol et
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkCategoryUpdates();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+  
+  // Kategorileri getiren fonksiyon
+  const fetchCategories = async () => {
+    try {
+      console.log("Kategoriler getiriliyor...");
+      
+      // API çağrısı
+      const response = await api.get(`/api/categories`);
+      console.log("Kategori API yanıtı:", response.data);
+      
+      if (response.data && Array.isArray(response.data)) {
+        // Kategori image_url'lerini bir objeye dönüştür
+        const images = {};
+        response.data.forEach(category => {
+          if (category.name) {
+            // Resim URL'sini oluştur - önbellek kırıcı parametrelerle
+            const imageUrl = getCategoryImageUrl(
+              category.name, 
+              category.image_version
+            );
+            
+            images[category.name] = imageUrl;
+            console.log(`Kategori: ${category.name}, Resim URL: ${imageUrl}`);
+            
+            // DOM'daki mevcut kategori resimlerini hemen güncelle
+            setTimeout(() => {
+              const categoryImages = document.querySelectorAll(`img[data-category-name="${category.name}"]`);
+              console.log(`DOM'da "${category.name}" için ${categoryImages.length} adet resim bulundu`);
+              
+              categoryImages.forEach(img => {
+                img.setAttribute('data-category-name', category.name);
+                img.setAttribute('src', imageUrl);
+              });
+            }, 50);
+          }
+        });
+        
+        console.log("Kategori görselleri state'e yüklendi:", images);
+        setCategoryImages(images);
+      }
+    } catch (err) {
+      console.error("Kategoriler yüklenirken hata:", err);
+    }
+  };
+  
+  // Kategori listesi bileşeni
+  const renderCategoryList = () => {
+    return Object.keys(groupedWithTeaFirst).map(categoryName => {
+      // Kategori resim URL'sini al veya varsayılan kullan
+      const imageUrl = categoryImages[categoryName] || getCategoryImageUrl(categoryName);
+      
+      return (
+        <button
+          key={categoryName}
+          onClick={() => handleCategoryClick(categoryName)}
+          className={`category-button flex-shrink-0 px-3 py-2 rounded-lg shadow-md transition-all 
+            ${activeCategory === categoryName ? 'ring-2 ring-accent-500 theme-category-override' : 'bg-white text-gray-800 hover:bg-gray-50'}`}
+        >
+          <div className="flex flex-col items-center space-y-1">
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100">
+              <img
+                src={imageUrl}
+                alt={categoryName}
+                className="w-full h-full object-cover"
+                data-category-name={categoryName}
+                onError={(e) => {
+                  e.target.src = "/category/default.jpg";
+                }}
+              />
+            </div>
+            <span className="text-xs font-medium truncate w-full text-center">{categoryName}</span>
+          </div>
+        </button>
+      );
+    });
+  };
+  
+  // Ürün listesi rendering fonksiyonu...
+  
+  // QrMenu return bileşeni...
+  return (
+    <div className="pb-20 theme-bg min-h-screen">
+      {/* Mevcut JSX içeriği... */}
+      
+      {/* Kategori listesi */}
+      <div className="category-list flex overflow-x-auto space-x-3 px-4 py-3 no-scrollbar">
+        {renderCategoryList()}
+      </div>
+      
+      {/* Kategoriye göre ürünler */}
+      <div className="px-4 pb-20">
+        {Object.entries(groupedWithTeaFirst).map(([categoryName, products]) => (
+          <div 
+            key={categoryName} 
+            id={`section-${categoryName}`}
+            className="pt-3 pb-6"
+          >
+            <div className="category-header flex items-center mb-4">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 mr-3">
+                <img
+                  src={categoryImages[categoryName] || getCategoryImageUrl(categoryName)}
+                  alt={categoryName}
+                  className="w-full h-full object-cover"
+                  data-category-name={categoryName}
+                  onError={(e) => {
+                    e.target.src = "/category/default.jpg";
+                  }}
+                />
+              </div>
+              <h2 className="text-xl font-bold">{categoryName}</h2>
+            </div>
+            
+            {/* Ürün listesi */}
+            <div className="grid grid-cols-1 gap-3">
+              {products.map(product => (
+                // Ürün kartı...
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Diğer JSX içeriği... */}
+    </div>
+  );
+};
+
+export default QrMenu;

@@ -483,7 +483,7 @@ const BranchProductManager = () => {
     toast.success("Excel dosyası indiriliyor...");
   }, [products, branchLookup, selectedBranchId]);
 
-  // Excel'den içe aktar
+  // Excel'den içe aktar - GÜNCELLENDİ
   const handleImportExcel = useCallback(async (e) => {
     // Super Admin değilse engelle
     if (!isSuperAdmin) {
@@ -498,6 +498,7 @@ const BranchProductManager = () => {
     if (!file) return;
 
     setUploadLoading(true);
+    toast.loading("Excel dosyası içe aktarılıyor...");
 
     try {
       // Excel verilerini oku
@@ -505,6 +506,9 @@ const BranchProductManager = () => {
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      // Ham veriyi loglayalım (hata ayıklama için)
+      logger.debug("Excel'den içe aktarılan ham veriler:", jsonData);
 
       // Önce şube bilgilerini alalım
       const branchCheck = await api.get(`/api/branches/${selectedBranchId}`);
@@ -514,68 +518,115 @@ const BranchProductManager = () => {
       if (branch.menu_template_id) {
         logger.info(`Şube ${selectedBranchId} için menü şablonu ID: ${branch.menu_template_id} kullanılacak`);
 
-        // Bu işlem için özel bir API endpointi oluşturmamız gerekiyor
-        // Filter out any rows missing a product name or category, then map to the payload shape
+        // Tüm farklı formatlardaki verileri destekleyelim
         const productsData = jsonData
-          .filter(item => item['Ürün Adı'] && item['Kategori']) // Sadece geçerli ürünleri al
-          .map(item => ({
-            name: item['Ürün Adı'],
-            category: item['Kategori'],
-            price: parseFloat(item['Fiyat']) || 0,
-            stock_count: parseInt(item['Stok']) || 0,
-            is_visible: item['Görünür'] === 'Evet',
-            description: item['Açıklama'] || '',
-            image_url: item['Görsel URL'] || ''
-          }));
+          .filter(item => {
+            // Ürün adı için farklı alan isimleri
+            const hasName = item['Ürün Adı'] || item['Ürün'] || item['Name'] || item['Product Name'];
+            // Kategori için farklı alan isimleri
+            const hasCategory = item['Kategori'] || item['Category'] || item['Kategori Adı'] || item['Category Name']; 
+            return hasName && hasCategory;
+          })
+          .map(item => {
+            // Her veri alanı için alternatif alan isimlerini destekle
+            const name = item['Ürün Adı'] || item['Ürün'] || item['Name'] || item['Product Name'];
+            const category = item['Kategori'] || item['Category'] || item['Kategori Adı'] || item['Category Name'];
+            const price = parseFloat(item['Fiyat'] || item['Price'] || 0);
+            const stock = parseInt(item['Stok'] || item['Stock'] || 0) || 0;
+            
+            // Görünürlük için çeşitli formatları destekle
+            let isVisible = true; // Varsayılan olarak görünür
+            if (item.hasOwnProperty('Görünür') || item.hasOwnProperty('Visible')) {
+              const visibilityValue = item['Görünür'] || item['Visible'];
+              if (typeof visibilityValue === 'string') {
+                isVisible = ['evet', 'yes', 'true', '1'].includes(visibilityValue.toLowerCase());
+              } else if (typeof visibilityValue === 'boolean') {
+                isVisible = visibilityValue;
+              } else if (typeof visibilityValue === 'number') {
+                isVisible = visibilityValue === 1;
+              }
+            }
+            
+            // Açıklama ve görsel URL için alternatif alanları destekle
+            const description = item['Açıklama'] || item['Description'] || '';
+            const imageUrl = item['Görsel URL'] || item['Image URL'] || item['Görsel'] || item['Image'] || '';
+            
+            return {
+              name,
+              category, // Önemli: category_name değil, category kullanıyoruz!
+              price,
+              stock_count: stock,
+              is_visible: isVisible,
+              description,
+              image_url: imageUrl
+            };
+          });
 
         // En az bir ürün olduğundan emin ol
         if (productsData.length === 0) {
+          toast.dismiss();
           throw new Error("İçe aktarılacak geçerli ürün bulunamadı");
         }
 
         const importData = {
-          branchId: selectedBranchId, 
-          menuTemplateId: branch.menu_template_id,
+          branchId: parseInt(selectedBranchId), 
+          menuTemplateId: parseInt(branch.menu_template_id),
           products: productsData
         };
 
-        console.log("API'ye gönderilecek veri:", importData);
+        logger.info("API'ye gönderilecek veri:", importData);
 
-        // Şablona ürün ekleyecek yeni API çağrısı
-        await api.post(`/api/templates/import-template-products`, importData);
+        // Şablona ürün ekleyecek API çağrısı - tekrar çağrılmasına gerek yok
+        const importResponse = await api.post(`/api/templates/import-template-products`, importData);
 
-
-        // Şablona ürün ekleyecek yeni API çağrısı
-        await api.post(`/api/templates/import-template-products`, importData);
-
-        toast.success("Şablon ürünleri başarıyla içe aktarıldı");
+        toast.dismiss();
+        // Yanıtta istatistikler varsa gösterelim
+        if (importResponse.data && importResponse.data.stats) {
+          const stats = importResponse.data.stats;
+          toast.success(`İçe aktarma tamamlandı: ${stats.inserted || 0} yeni ürün, ${stats.updated || 0} güncellendi, ${stats.skipped || 0} atlandı`);
+        } else {
+          toast.success(`${productsData.length} ürün başarıyla içe aktarıldı`);
+        }
       } else {
         // Şablonsuz içe aktarma (klasik yöntem)
+        // Farklı formatlarda veri destekle
         const products = jsonData.map(item => ({
-          Ürün: item['Ürün Adı'] || item['Ürün'] || '',
-          Kategori: item['Kategori'] || '',
-          Fiyat: parseFloat(item['Fiyat']) || 0,
-          Stok: parseInt(item['Stok']) || 0,
-          Görsel: item['Görsel URL'] || item['Görsel'] || '',
-          Açıklama: item['Açıklama'] || '',
-          BranchId: parseInt(selectedBranchId) // Burada şube ID'sini de gönderiyoruz
+          Ürün: item['Ürün Adı'] || item['Ürün'] || item['Name'] || item['Product Name'] || '',
+          Kategori: item['Kategori'] || item['Category'] || item['Kategori Adı'] || item['Category Name'] || '',
+          Fiyat: parseFloat(item['Fiyat'] || item['Price'] || 0),
+          Stok: parseInt(item['Stok'] || item['Stock'] || 0) || 0,
+          Görsel: item['Görsel URL'] || item['Image URL'] || item['Görsel'] || item['Image'] || '',
+          Açıklama: item['Açıklama'] || item['Description'] || '',
+          BranchId: parseInt(selectedBranchId)
         }));
+
+        // Geçerli ürün var mı kontrol et
+        if (products.length === 0 || !products.some(p => p.Ürün && p.Kategori)) {
+          toast.dismiss();
+          throw new Error("İçe aktarılacak geçerli ürün bulunamadı");
+        }
 
         // Backend'e gönder
         const response = await api.post("/api/products/bulk", {
           products,
-          branchId: selectedBranchId  // Şube ID'sini ayrıca gönderelim
+          branchId: selectedBranchId
         });
 
-        toast.success(`İçe aktarma tamamlandı: ${response.data.stats.inserted} ürün eklendi, ${response.data.stats.skipped} atlandı`);
+        toast.dismiss();
+        if (response.data && response.data.stats) {
+          toast.success(`İçe aktarma tamamlandı: ${response.data.stats.inserted} ürün eklendi, ${response.data.stats.skipped} atlandı`);
+        } else {
+          toast.success(`${products.length} ürün başarıyla içe aktarıldı`);
+        }
       }
 
       // Ürünleri yeniden yükle
       fetchBranchProducts(selectedBranchId);
 
     } catch (error) {
+      toast.dismiss();
       logger.error("Excel içe aktarılırken hata:", error);
-      toast.error("Excel içe aktarılamadı!");
+      toast.error(`Excel içe aktarılamadı: ${error.message || "Bilinmeyen hata"}`);
     } finally {
       setUploadLoading(false);
       setShowUploadModal(false);
