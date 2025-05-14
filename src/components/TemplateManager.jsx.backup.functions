@@ -1,0 +1,2234 @@
+import { useState, useEffect, useRef } from "react";
+import {
+  FiEdit2, FiTrash2, FiPlus, FiInfo, FiSettings, FiCheck,
+  FiX, FiUpload, FiDownload, FiEye, FiEyeOff, FiPackage, FiCopy,
+  FiGrid, FiList, FiChevronDown, FiChevronRight, FiLink
+} from "react-icons/fi";
+import { HiOutlineDocumentSearch } from "react-icons/hi";
+import { MdLinkOff } from 'react-icons/md';
+import React from "react";
+import api from "../lib/axios";
+import toast from "react-hot-toast";
+import { Tab } from '@headlessui/react';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
+// Yeni modal bileşenleri import
+import ProductModal from "./modals/ProductModal";
+import TemplateModal from "./modals/TemplateModal";
+
+// Zustand store import
+import useModalStore from "../stores/modalStore";
+
+// Çeşme Kahvecisi tema renkleri
+const theme = {
+  primary: "#022B45",      // Koyu mavi
+  secondary: "#B8D7DD",    // Açık mavi
+  accent: "#D98A3D",       // Amber/Turuncu
+  light: "#F4F7F8",        // Açık gri
+  dark: "#343a40",         // Koyu gri
+  success: "#28a745",      // Yeşil
+  danger: "#dc3545",       // Kırmızı
+  warning: "#ffc107",      // Sarı
+  info: "#17a2b8",         // Bilgi rengi
+  white: "#ffffff",        // Beyaz
+  textPrimary: "#495057",  // Ana metin rengi
+  textSecondary: "#6c757d" // İkincil metin rengi
+};
+
+// Şablon türleri
+const templateTypes = {
+  MENU: "menu",
+  PRICE: "price",
+  INTEGRATION: "integration"
+};
+
+const EnhancedTemplateManager = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [templates, setTemplates] = useState({
+    [templateTypes.MENU]: [],
+    [templateTypes.PRICE]: [],
+    [templateTypes.INTEGRATION]: []
+  });
+  const [loading, setLoading] = useState(true);
+  // Zustand modal store'dan gerekli durumları al
+  const { 
+    modals, 
+    openModal, 
+    closeModal, 
+    currentTemplate, 
+    currentTemplateType, 
+    currentTemplateId,
+    setModalState 
+  } = useModalStore();
+  
+  // Eski state'leri kaldırdık ve Zustand ile değiştirdik:
+  const [searchTerm, setSearchTerm] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Görünüm Modu
+  const [viewMode, setViewMode] = useState("grid"); // "grid" veya "table"
+
+  // Ürün Yönetimi
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [showPriceProductsModal, setShowPriceProductsModal] = useState(false);
+  const [currentTemplateId, setCurrentTemplateId] = useState(null);
+  const [templateProducts, setTemplateProducts] = useState([]);
+  const [templatePriceProducts, setTemplatePriceProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [productFilter, setProductFilter] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("");
+  const [productLoading, setProductLoading] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  // Yeni ürün ekleme modalını aç
+  const handleAddProductClick = () => {
+    setEditingProduct(null); // Düzenleme modunu kapat
+    setShowProductModal(true);
+  };
+  
+  // Ürün düzenleme modalını aç
+  const handleEditProductClick = (product) => {
+    setEditingProduct(product);
+    setShowProductModal(true);
+  };
+
+  // Kategori bazlı görünürlük ayarları için yeni state
+  const [expandedCategories, setExpandedCategories] = useState([]);
+
+  // Excel import için dosya referansı
+  const fileInputRef = useRef(null);
+  const priceFileInputRef = useRef(null);
+
+  const [currentType, setCurrentType] = useState(templateTypes.MENU);
+
+  const [menuForm, setMenuForm] = useState({
+    name: "",
+    description: "",
+    is_active: true
+  });
+
+  const [priceForm, setPriceForm] = useState({
+    name: "",
+    description: "",
+    is_active: true,
+    year: new Date().getFullYear(),
+    menu_template_id: "" // Menü şablonu ID'si eklendi
+  });
+
+  const [integrationForm, setIntegrationForm] = useState({
+    name: "",
+    type: "delivery",
+    description: "",
+    is_active: true,
+    config: {
+      api_key: "",
+      endpoint: "",
+      options: {}
+    }
+  });
+
+  // Şablon kopyalama ile ilgili state
+  const [copyingTemplate, setCopyingTemplate] = useState(null);
+  const [copyName, setCopyName] = useState("");
+  const [copyDetails, setCopyDetails] = useState(null);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [copyStep, setCopyStep] = useState(0);
+  const [newTemplateInfo, setNewTemplateInfo] = useState(null);
+  const [copyResults, setCopyResults] = useState(null);
+  // LocalStorage'dan görünüm tercihini yükle
+  useEffect(() => {
+    const savedViewMode = localStorage.getItem('templateManagerViewMode');
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
+    }
+  }, []);
+
+  // Seçili ürünler değiştiğinde sabit çubuğu göster/gizle
+  useEffect(() => {
+    const fixedBar = document.getElementById('fixed-action-bar');
+    if (fixedBar) {
+      if (selectedProducts.length > 0) {
+        fixedBar.classList.remove('hidden');
+        fixedBar.classList.add('flex');
+      } else {
+        fixedBar.classList.add('hidden');
+        fixedBar.classList.remove('flex');
+      }
+    }
+
+    // Eğer sayfadan ayrılırken seçim varsa temizle
+    return () => {
+      if (selectedProducts.length > 0) {
+        setSelectedProducts([]);
+      }
+    };
+  }, [selectedProducts]);
+
+  // Görünüm tercihini kaydet
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('templateManagerViewMode', mode);
+  };
+
+  // Şablonları getir
+  const fetchTemplates = async () => {
+    setLoading(true);
+    try {
+      // Farklı türlerdeki şablonlar için paralel API istekleri
+      const [menuRes, priceRes, integrationRes] = await Promise.all([
+        api.get("/api/templates/menu"),
+        api.get("/api/templates/price"),
+        api.get("/api/integrations")
+      ]);
+
+      setTemplates({
+        [templateTypes.MENU]: menuRes.data,
+        [templateTypes.PRICE]: priceRes.data,
+        [templateTypes.INTEGRATION]: integrationRes.data
+      });
+    } catch (error) {
+      console.error("Şablonlar yüklenirken hata:", error);
+      toast.error("Şablonlar yüklenemedi!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tüm ürünleri getir
+  const fetchAllProducts = async () => {
+    try {
+      const response = await api.get("/api/products");
+      setAllProducts(response.data);
+    } catch (error) {
+      console.error("Tüm ürünler yüklenirken hata:", error);
+      toast.error("Ürünler yüklenemedi!");
+    }
+  };
+
+  // Kategorileri getir
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get("/api/categories");
+      setCategories(response.data);
+    } catch (error) {
+      console.error("Kategoriler yüklenirken hata:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTemplates();
+    fetchAllProducts();
+    fetchCategories();
+  }, []);
+
+  // Kategori açılıp kapanmasını kontrol eder
+  const toggleCategoryExpand = (categoryId) => {
+    if (expandedCategories.includes(categoryId)) {
+      setExpandedCategories(expandedCategories.filter(id => id !== categoryId));
+    } else {
+      setExpandedCategories([...expandedCategories, categoryId]);
+    }
+  };
+
+  // Kategori bazlı görünürlük değiştirme
+  const handleCategoryVisibilityToggle = async (categoryId, makeVisible, e) => {
+    // Event propagasyonunu durdur
+    if (e) {
+      e.stopPropagation();
+    }
+
+    try {
+      // Bu kategorideki tüm ürünleri bul
+      const categoryProducts = templateProducts.filter(
+        product => product.category_id?.toString() === categoryId.toString()
+      );
+
+      if (categoryProducts.length === 0) {
+        toast.warning("Bu kategoride ürün bulunamadı");
+        return;
+      }
+
+      // Ürün ID'lerini topla
+      const productIds = categoryProducts.map(product => product.id);
+
+      // API için istek hazırla
+      const productUpdates = productIds.map(productId => ({
+        product_id: productId,
+        is_visible: makeVisible
+      }));
+
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // Sadece yerel state'i güncelle - ÖNEMLİ: Tüm state'i YENİLEME, sadece ilgili kategoriyi güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product => {
+          if (product.category_id?.toString() === categoryId.toString()) {
+            return { ...product, is_visible: makeVisible };
+          }
+          return product;
+        })
+      );
+
+      toast.success(`${categoryProducts.length} ürünün görünürlüğü değiştirildi`);
+    } catch (error) {
+      console.error("Kategori görünürlüğü güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+  const handleInitiateCopy = async (template, type) => {
+    try {
+      setCopyLoading(true);
+      setCopyingTemplate({ ...template, type });
+      setCopyName(`${template.name} - Kopya`);
+
+      // Daha detaylı bilgiler topla
+      let details = {
+        items: 0,
+        categories: new Set(),
+        lastUpdated: template.updated_at,
+        customFields: []
+      };
+
+      if (type === templateTypes.MENU) {
+        const productsResponse = await api.get(`/api/templates/menu/${template.id}/products`, {
+          params: { onlyTemplateProducts: 'true' }
+        });
+
+        if (productsResponse?.data) {
+          const products = productsResponse.data;
+
+          details.items = products.length;
+
+          const categories = new Set();
+          const categoryStats = {};
+
+          products.forEach(p => {
+            if (p.category_name) {
+              categories.add(p.category_name);
+
+              if (!categoryStats[p.category_name]) {
+                categoryStats[p.category_name] = 0;
+              }
+              categoryStats[p.category_name]++;
+            }
+          });
+
+          details.categories = categories;
+          details.categoryStats = categoryStats;
+
+          details.visibleItems = products.filter(p => p.is_visible).length;
+
+          details.topCategories = Object.entries(categoryStats)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name, count]) => ({ name, count }));
+        }
+      }
+      else if (type === templateTypes.PRICE) {
+        const priceResponse = await api.get(`/api/templates/price/${template.id}/products`);
+
+        if (priceResponse?.data) {
+          const priceProducts = priceResponse.data;
+          details.items = priceProducts.length;
+
+          const customPriceProducts = priceProducts.filter(p =>
+            p.template_price && p.template_price !== p.price
+          );
+
+          details.customPrices = customPriceProducts.length;
+
+          if (customPriceProducts.length > 0) {
+            let totalPriceChange = 0;
+            let priceChanges = {
+              increased: 0,
+              decreased: 0,
+              same: 0
+            };
+
+            customPriceProducts.forEach(p => {
+              const originalPrice = p.price || 0;
+              const templatePrice = p.template_price || 0;
+              const diff = templatePrice - originalPrice;
+
+              totalPriceChange += diff;
+
+              if (diff > 0) priceChanges.increased++;
+              else if (diff < 0) priceChanges.decreased++;
+              else priceChanges.same++;
+            });
+
+            details.priceChanges = priceChanges;
+            details.avgPriceChange = totalPriceChange / customPriceProducts.length;
+          }
+
+          if (template.menu_template_id) {
+            details.linkedMenu = getTemplateName('menu', template.menu_template_id);
+            details.linkedMenuId = template.menu_template_id;
+            details.keepMenuLink = true;
+          }
+        }
+      }
+
+      setCopyDetails(details);
+      setCopyStep(0);
+    } catch (error) {
+      console.error("Kopyalama başlatılırken hata:", error);
+      toast.error("Kopyalama bilgileri alınamadı");
+    } finally {
+      setCopyLoading(false);
+    }
+  };
+
+  // Ürün seçimini açıp kapatan fonksiyon
+  const toggleProductSelection = (productId, e) => {
+    // Event gelirse önce propagasyonu durdur
+    if (e) {
+      e.stopPropagation();
+    }
+
+    // Seçimi güncelle
+    setSelectedProducts(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  // Seçili ürünleri görünür yapma fonksiyonu
+  const makeSelectedProductsVisible = async () => {
+    try {
+      if (selectedProducts.length === 0) {
+        toast.warning("Lütfen önce ürün seçin");
+        return;
+      }
+
+      const productUpdates = selectedProducts.map(productId => ({
+        product_id: productId,
+        is_visible: true
+      }));
+
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // Yerel state'i güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          selectedProducts.includes(product.id)
+            ? { ...product, is_visible: true }
+            : product
+        )
+      );
+
+      toast.success(`${selectedProducts.length} ürün görünür yapıldı`);
+      setSelectedProducts([]); // Seçimi temizle
+
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+  // Seçili ürünleri görünmez yapma fonksiyonu - Düzeltilmiş
+  const makeSelectedProductsInvisible = async () => {
+    try {
+      if (selectedProducts.length === 0) {
+        toast.warning("Lütfen önce ürün seçin");
+        return;
+      }
+
+      const productUpdates = selectedProducts.map(productId => ({
+        product_id: productId,
+        is_visible: false
+      }));
+
+      // Toplu güncelleme isteği gönder
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+
+      // Yerel state'i güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          selectedProducts.includes(product.id)
+            ? { ...product, is_visible: false }
+            : product
+        )
+      );
+
+      toast.success(`${selectedProducts.length} ürün gizlendi`);
+      setSelectedProducts([]); // Seçimi temizle
+
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+
+  // Kopyalama işlemini gerçekleştiren fonksiyon
+  const executeTemplateCopy = async () => {
+    if (!copyingTemplate || !copyName.trim()) return;
+
+    try {
+      setCopyLoading(true);
+      let newCopyId = null;
+      let copyResults = {
+        success: false,
+        templateId: null,
+        copiedItems: 0,
+        categories: 0,
+        details: []
+      };
+
+      // Şablon tipine göre farklı kopyalama işlemleri
+      if (copyingTemplate.type === templateTypes.MENU) {
+
+        const copyResponse = await api.post("/api/templates/menu", {
+          name: copyName,
+          description: copyingTemplate.description,
+          is_active: copyingTemplate.is_active
+        });
+
+        newCopyId = copyResponse.data.id;
+        console.log(`Yeni menü şablonu oluşturuldu (ID: ${newCopyId})`);
+
+        const productsResponse = await api.get(`/api/templates/menu/${copyingTemplate.id}/products`, {
+          params: { onlyTemplateProducts: 'true' }
+        });
+
+        const products = productsResponse.data;
+
+        if (products && products.length > 0) {
+          console.log(`${products.length} ürün kopyalanıyor...`);
+
+          const productUpdates = products.map(product => ({
+            product_id: product.id,
+            is_visible: product.is_visible
+          }));
+
+          await api.post(`/api/templates/menu/${newCopyId}/products`, {
+            products: productUpdates
+          });
+
+          copyResults = {
+            success: true,
+            templateId: newCopyId,
+            copiedItems: products.length,
+            categories: copyDetails.categories.size,
+            details: [
+              `${products.length} ürün başarıyla kopyalandı`,
+              `${copyDetails.visibleItems} görünür ürün`,
+              `${copyDetails.categories.size} farklı kategoride ürün`
+            ]
+          };
+        }
+      }
+      else if (copyingTemplate.type === templateTypes.PRICE) {
+
+        const copyResponse = await api.post("/api/templates/price", {
+          name: copyName,
+          description: copyingTemplate.description,
+          is_active: copyingTemplate.is_active,
+          year: copyingTemplate.year || new Date().getFullYear(),
+          // Checkbox'a göre menü şablonunu kopyala veya boş bırak
+          menu_template_id: copyDetails.keepMenuLink ? copyingTemplate.menu_template_id : null
+        });
+
+        newCopyId = copyResponse.data.id;
+
+        // 2. Eski şablondaki fiyatları getir
+        const priceProductsResponse = await api.get(`/api/templates/price/${copyingTemplate.id}/products`);
+        const priceProducts = priceProductsResponse.data;
+
+        // 3. Fiyatları yeni şablona ekle
+        if (priceProducts && priceProducts.length > 0) {
+
+          const priceUpdates = priceProducts.map(product => ({
+            product_id: product.id,
+            price: product.template_price || product.price
+          }));
+
+          await api.post(`/api/templates/price/${newCopyId}/products`, {
+            products: priceUpdates
+          });
+
+          const details = [];
+          details.push(`${priceProducts.length} ürün fiyatı başarıyla kopyalandı`);
+
+          if (copyDetails.customPrices > 0) {
+            details.push(`${copyDetails.customPrices} özel fiyat ayarı korundu`);
+          }
+
+          if (copyDetails.keepMenuLink && copyDetails.linkedMenu) {
+            details.push(`"${copyDetails.linkedMenu}" menü şablonu bağlantısı korundu`);
+          }
+
+          copyResults = {
+            success: true,
+            templateId: newCopyId,
+            copiedItems: priceProducts.length,
+            customPrices: copyDetails.customPrices,
+            linkedMenu: copyDetails.keepMenuLink ? copyDetails.linkedMenu : null,
+            details: details
+          };
+        }
+      }
+      else if (copyingTemplate.type === templateTypes.INTEGRATION) {
+
+        const copyResponse = await api.post("/api/integrations", {
+          name: copyName,
+          type: copyingTemplate.type,
+          description: copyingTemplate.description,
+          is_active: copyingTemplate.is_active,
+          config: copyingTemplate.config
+        });
+
+        newCopyId = copyResponse.data.id;
+
+        copyResults = {
+          success: true,
+          templateId: newCopyId,
+          details: [
+            "Entegrasyon ayarları başarıyla kopyalandı",
+            `Entegrasyon türü: ${copyingTemplate.type === 'delivery' ? 'Teslimat' :
+              copyingTemplate.type === 'payment' ? 'Ödeme' :
+                copyingTemplate.type === 'order' ? 'Sipariş' :
+                  copyingTemplate.type === 'menu' ? 'Menü' : 'Diğer'}`
+          ]
+        };
+      }
+      setCopyResults(copyResults);
+      // Kopyalama başarılı, sonraki adıma geç
+      toast.success(`"${copyName}" şablonu başarıyla oluşturuldu`);
+      setCopyStep(2);
+
+      if (newCopyId) {
+        setNewTemplateInfo({
+          id: newCopyId,
+          type: copyingTemplate.type,
+          name: copyName
+        });
+      }
+
+    } catch (error) {
+      console.error("Şablon kopyalanırken hata:", error);
+      let errorMessage = "Şablon kopyalanamadı";
+
+      // API'nin sunduğu hata mesajını göster, yoksa genel hata mesajı
+      if (error.response?.data?.error) {
+        errorMessage += ": " + error.response.data.error;
+      } else if (error.message) {
+        errorMessage += ": " + error.message;
+      }
+
+      toast.error(errorMessage);
+      setCopyStep(0); // Hata durumunda ilk adıma dön
+    } finally {
+      setCopyLoading(false);
+    }
+  };
+  // Form değişikliklerini izle
+  const handleMenuFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+    setMenuForm({ ...menuForm, [name]: inputValue });
+  };
+
+  const handlePriceFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+    setPriceForm({ ...priceForm, [name]: inputValue });
+  };
+
+  const handleIntegrationFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const inputValue = type === 'checkbox' ? checked : value;
+
+    if (name.startsWith('config.')) {
+      // Config alt nesnesi için değişiklik
+      const configKey = name.split('.')[1];
+      setIntegrationForm({
+        ...integrationForm,
+        config: {
+          ...integrationForm.config,
+          [configKey]: value
+        }
+      });
+    } else {
+      setIntegrationForm({ ...integrationForm, [name]: inputValue });
+    }
+  };
+
+  // Şablon ekleme/düzenleme modalını aç - Zustand ile güncellendi
+  const handleAddEditTemplate = (template = null, type) => {
+    // Modal türüne göre doğru modalı belirle
+    const modalName = type === templateTypes.INTEGRATION 
+      ? 'integrationModal' 
+      : 'templateModal';
+    
+    // Zustand store'u kullanarak modalı aç
+    openModal(modalName, {
+      template: template,
+      templateType: type
+    });
+  };
+
+  // Ürün modalını aç - Zustand ile güncelleyelim
+  const handleProductModal = (product = null) => {
+    openModal('productModal', {
+      editingProduct: product
+    });
+  };
+
+  // Ürün yönetimi için temel fonksiyonlar
+            api_key: "",
+            endpoint: "",
+            options: {}
+          }
+        });
+        setShowIntegrationModal(true);
+      }
+    }
+  };
+
+  // Form gönderimi
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      let response;
+      let formData;
+      let endpoint;
+
+      if (currentType === templateTypes.MENU) {
+        formData = menuForm;
+        endpoint = "/api/templates/menu";
+      }
+      else if (currentType === templateTypes.PRICE) {
+        formData = priceForm;
+        endpoint = "/api/templates/price";
+      }
+
+      if (editingTemplate) {
+        // Var olan şablonu güncelle
+        response = await api.put(`${endpoint}/${editingTemplate.id}`, formData);
+        toast.success(`${formData.name} şablonu başarıyla güncellendi`);
+      } else {
+        // Yeni şablon ekle
+        response = await api.post(endpoint, formData);
+        toast.success(`${formData.name} şablonu başarıyla eklendi`);
+      }
+
+      // Şablonları yeniden yükle
+      fetchTemplates();
+
+      // Modalı kapat
+      setShowModal(false);
+
+    } catch (error) {
+      console.error("Form gönderilirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+  // Entegrasyon formu gönderimi
+  const handleIntegrationSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      let response;
+
+      if (editingTemplate) {
+        // Var olan entegrasyonu güncelle
+        response = await api.put(`/api/integrations/${editingTemplate.id}`, integrationForm);
+        toast.success(`${integrationForm.name} entegrasyonu başarıyla güncellendi`);
+      } else {
+        // Yeni entegrasyon ekle
+        response = await api.post("/api/integrations", integrationForm);
+        toast.success(`${integrationForm.name} entegrasyonu başarıyla eklendi`);
+      }
+
+      // Şablonları yeniden yükle
+      fetchTemplates();
+
+      // Modalı kapat
+      setShowIntegrationModal(false);
+
+    } catch (error) {
+      console.error("Entegrasyon formu gönderilirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+
+  // Şablon silme işlemi
+  const handleDelete = async (templateId, type) => {
+    try {
+      let endpoint;
+
+      if (type === templateTypes.MENU) {
+        endpoint = "/api/templates/menu";
+      }
+      else if (type === templateTypes.PRICE) {
+        endpoint = "/api/templates/price";
+      }
+      else if (type === templateTypes.INTEGRATION) {
+        endpoint = "/api/integrations";
+      }
+
+      await api.delete(`${endpoint}/${templateId}`);
+
+      // Şablonları güncelle
+      setTemplates(prev => ({
+        ...prev,
+        [type]: prev[type].filter(template => template.id !== templateId)
+      }));
+
+      toast.success("Şablon başarıyla silindi");
+      setConfirmDelete(null); // Silme onay penceresini kapat
+    } catch (error) {
+      console.error("Şablon silinirken hata:", error);
+      toast.error("Şablon silinemedi!");
+    }
+  };
+
+  // Filtreleme işlemleri
+  const getFilteredTemplates = (type) => {
+    return templates[type].filter(template => {
+      return (
+        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  };
+
+  // Tab değişikliğini izle
+  const handleTabChange = (index) => {
+    setActiveTab(index);
+
+    // Tab değiştiğinde şablon türünü güncelle
+    if (index === 0) setCurrentType(templateTypes.MENU);
+    else if (index === 1) setCurrentType(templateTypes.PRICE);
+    else if (index === 2) setCurrentType(templateTypes.INTEGRATION);
+  };
+
+  // Şube ürünlerini yeniden yükle 
+  const handleRefreshProducts = async (templateId, showAll = false) => {
+    if (!templateId) return;
+
+    setProductLoading(true);
+    try {
+      console.log(`Template ID ${templateId} için ürünler getiriliyor... (Tüm ürünleri göster: ${showAll})`);
+
+      // Mevcut açık kategorileri hatırla
+      const currentExpandedCategories = [...expandedCategories];
+
+      // API çağrısını güncelle: showAll true ise tüm ürünleri getir
+      const response = await api.get(`/api/templates/menu/${templateId}/products`, {
+        params: { onlyTemplateProducts: !showAll ? 'true' : 'false' }
+      });
+
+      console.log(`${response.data.length} ürün başarıyla alındı`);
+      setTemplateProducts(response.data);
+
+      // Önceden açık olan kategorileri tekrar aç
+      setExpandedCategories(currentExpandedCategories);
+
+    } catch (error) {
+      console.error("Ürünler yenilenirken hata:", error);
+      toast.error("Ürünler yenilenemedi!");
+    } finally {
+      setProductLoading(false);
+    }
+  };
+  // Menü şablonundaki ürünleri yönetme fonksiyonu
+  const handleManageMenuProducts = async (templateId) => {
+    setProductLoading(true);
+    try {
+      console.log(`Template ID ${templateId} için ürünler getiriliyor...`);
+
+      // showAllProducts state değişkenini kullan ve değerin güncel olduğundan emin ol
+      const response = await api.get(`/api/templates/menu/${templateId}/products`, {
+        params: { onlyTemplateProducts: !showAllProducts ? 'true' : 'false' }
+      });
+
+      console.log(`Şablon ürünleri başarıyla alındı: ${response.data.length} ürün`);
+
+      // Ürün yönetim modalını aç
+      setTemplateProducts(response.data);
+      setCurrentTemplateId(templateId);
+      setShowProductsModal(true);
+
+      // İlk birkaç kategoriyi başlangıçta açalım (maksimum 3)
+      const uniqueCategories = [...new Set(response.data.map(p => p.category_id?.toString()).filter(Boolean))];
+      const categoriesToExpand = uniqueCategories.slice(0, 3);
+      setExpandedCategories(categoriesToExpand);
+
+    } catch (error) {
+      console.error("Şablon ürünleri yüklenirken hata:", error);
+      console.error("Hata detayları:", error.response?.data || "Detay yok");
+      toast.error("Şablon ürünleri yüklenemedi!");
+    } finally {
+      setProductLoading(false);
+    }
+  };
+
+  const handleManagePriceProducts = async (templateId) => {
+    setProductLoading(true);
+    try {
+      const checkTemplate = templates.price.find(t => t.id.toString() === templateId.toString());
+      if (!checkTemplate) {
+        throw new Error(`ID: ${templateId} ile fiyat şablonu bulunamadı.`);
+      }
+
+      console.log("Fiyat şablonu yönetimi başlatılıyor:", checkTemplate.name);
+
+      try {
+        const templateResponse = await api.get(`/api/templates/price/${templateId}`);
+        const priceTemplate = templateResponse.data;
+        console.log("Fiyat şablonu detayları:", priceTemplate);
+
+        if (priceTemplate.menu_template_id) {
+          console.log(`Bağlı menü şablonu ID: ${priceTemplate.menu_template_id} için ürünleri getir`);
+
+          try {
+            const menuProductsResponse = await api.get(`/api/templates/menu/${priceTemplate.menu_template_id}/products`, {
+              params: { onlyTemplateProducts: 'true' }
+            });
+
+            const priceProductsResponse = await api.get(`/api/templates/price/${templateId}/products`);
+
+            const menuProducts = menuProductsResponse.data;
+            const priceProducts = priceProductsResponse.data;
+
+            console.log(`Menü şablonunda ${menuProducts.length} ürün bulundu, fiyat şablonunda ${priceProducts.length} ürün fiyatı mevcut`);
+
+            const mergedProducts = menuProducts.map(menuProduct => {
+              const priceProduct = priceProducts.find(p => p.id === menuProduct.id);
+              return {
+                ...menuProduct,
+                template_price: priceProduct?.template_price || menuProduct.price
+              };
+            });
+
+            setTemplatePriceProducts(mergedProducts);
+          } catch (innerError) {
+            console.error("Menü şablonu ürünleri alınırken hata:", innerError);
+            // Hata durumunda yine de devam et, normal fiyatları getirmeyi dene
+            throw new Error(`Menü şablonu ürünleri alınamadı: ${innerError.message}`);
+          }
+        } else {
+          console.log("Bağlı menü şablonu yok, tüm ürünlerin fiyatlarını getir");
+          // Eski davranış: Menü şablonu belirtilmemişse tüm ürünleri getir
+          const productsResponse = await api.get(`/api/templates/price/${templateId}/products`);
+          setTemplatePriceProducts(productsResponse.data);
+        }
+      } catch (detailError) {
+        console.error("Fiyat şablonu detayları alınırken hata:", detailError);
+        // Fiyat şablonu detayları alınamazsa doğrudan fiyat ürünlerini getirmeyi dene
+        console.log("Alternatif yöntemle sadece fiyat ürünlerini getiriyorum");
+        const fallbackResponse = await api.get(`/api/templates/price/${templateId}/products`);
+        setTemplatePriceProducts(fallbackResponse.data);
+      }
+
+      // Fiyat yönetim modalını aç
+      setCurrentTemplateId(templateId);
+      setShowPriceProductsModal(true);
+    } catch (error) {
+      console.error("Şablon ürün fiyatları yüklenirken hata:", error);
+      toast.error(`Fiyat şablonu ürünleri yüklenemedi: ${error.message}`);
+    } finally {
+      setProductLoading(false);
+    }
+  };
+  // Ürün görünürlüğünü güncelle - Menü şablonu için
+  const handleProductVisibilityToggle = async (productId, isVisible) => {
+    try {
+      // API için istek hazırla
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: [{ product_id: productId, is_visible: !isVisible }]
+      });
+
+      // Yerel state'i güncelle
+      setTemplateProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId
+            ? { ...product, is_visible: !isVisible }
+            : product
+        )
+      );
+
+      toast.success("Ürün görünürlüğü güncellendi");
+    } catch (error) {
+      console.error("Görünürlük güncellenirken hata:", error);
+      toast.error("Görünürlük güncellenemedi!");
+    }
+  };
+
+  // Fiyat güncelleme - Fiyat şablonu için
+  const handlePriceUpdate = async (productId, newPrice) => {
+    try {
+      await api.post(`/api/templates/price/${currentTemplateId}/products`, {
+        products: [{ product_id: productId, price: parseFloat(newPrice) }]
+      });
+
+      // Yerel state'i güncelle
+      setTemplatePriceProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId
+            ? { ...product, template_price: parseFloat(newPrice) }
+            : product
+        )
+      );
+
+      toast.success("Ürün fiyatı güncellendi");
+    } catch (error) {
+      console.error("Fiyat güncellenirken hata:", error);
+      toast.error("Fiyat güncellenemedi!");
+    }
+  };
+
+  const handleMakeAllVisible = async () => {
+    try {
+      const productUpdates = filteredTemplateProducts.map(product => ({ // ÖNEMLİ: filteredTemplateProducts kullan
+        product_id: product.id,
+        is_visible: true
+      }));
+  
+      await api.post(`/api/templates/menu/${currentTemplateId}/products`, {
+        products: productUpdates
+      });
+  
+      // Yerel state'i güncelle - sadece filteredTemplateProducts içindeki ürünler
+      setTemplateProducts(prevProducts => 
+        prevProducts.map(product => {
+          const isInFiltered = filteredTemplateProducts.some(p => p.id === product.id);
+          if (isInFiltered) {
+            return { ...product, is_visible: true };
+          }
+          return product;
+        })
+      );
+  
+      toast.success("Filtrelenmiş ürünler görünür yapıldı");
+    } catch (error) {
+      console.error("Ürünler güncellenirken hata:", error);
+      toast.error("İşlem başarısız oldu!");
+    }
+  };
+
+  // Excel import fonksiyonu - Menü şablonu için (güncellenmiş)
+  const handleMenuTemplateExcelImport = async (e) => {
+    if (!currentTemplateId) {
+      toast.error("Lütfen önce bir menü şablonu seçin");
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setProductLoading(true);
+
+    try {
+      // Önce şube ID'sini bir kez getir
+      const branchesResponse = await api.get("/api/branches");
+      const defaultBranchId = branchesResponse.data[0]?.id || 1;
+      console.log("Varsayılan şube ID'si:", defaultBranchId);
+
+      // Excel dosyasını oku
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      console.log("Excel verisi okundu:", jsonData.slice(0, 3));
+
+      // Excel verilerini işle - kategori ve ürün kontrolü yap
+      const processedData = [];
+
+      for (const item of jsonData) {
+        // Temel bilgileri kontrol et
+        if (!item['Ürün Adı']) {
+          console.warn("Ürün adı eksik, bu satır atlanıyor:", item);
+          continue;
+        }
+        if (!item['Kategori']) {
+          console.warn("Kategori eksik, bu satır atlanıyor:", item);
+          continue;
+        }
+
+        // İşlenmiş ürün verisi 
+        const processedItem = {
+          name: item['Ürün Adı'],
+          category: item['Kategori'],
+          price: parseFloat(item['Fiyat']) || 0,
+          is_visible: item['Görünür'] === 'Evet',
+          description: item['Açıklama'] || '',
+          image_url: item['Görsel URL'] || '',
+          stock_count: parseInt(item['Stok']) || 0
+        };
+
+        // Eğer Excel dosyasında ID sütunu varsa, bunu çıkar
+        // ID değerini backend belirlesin
+        delete processedItem.id;
+
+        processedData.push(processedItem);
+      }
+
+      // Sadece isim ve kategorisi olan ürünleri al
+      const cleanProducts = processedData.filter(p => p.name && p.category);
+
+      if (cleanProducts.length === 0) {
+        throw new Error("Geçerli ürün verisi bulunamadı. Her ürünün en az isim ve kategori bilgisi olmalıdır.");
+      }
+
+      console.log(`${cleanProducts.length} ürün işlendi, API'ye gönderiliyor...`);
+
+      // Özel JSON formatı oluştur
+      const importData = {
+        branchId: defaultBranchId,
+        menuTemplateId: currentTemplateId,
+        products: cleanProducts
+      };
+
+      // API'ye gönderilecek veriyi logla
+      console.log("API'ye gönderilecek veri:", importData);
+
+      // Şablona ürün ekleyecek API çağrısı
+      const response = await api.post('/api/templates/import-template-products', importData);
+      console.log("API yanıtı:", response.data);
+
+      toast.success("Menü şablonu ürünleri başarıyla içe aktarıldı");
+
+      // Güncel ürünleri yeniden yükle - mevcut görünürlük ayarı ile
+      await handleRefreshProducts(currentTemplateId, showAllProducts);
+    } catch (error) {
+      console.error("Excel içe aktarılırken hata:", error);
+      console.error("Hata detayları:", error.response?.data || error.message);
+
+      // Daha açıklayıcı hata mesajı göster
+      if (error.message?.includes("duplicate key value") || error.response?.data?.error?.includes("duplicate")) {
+        toast.error("Bazı ürünler zaten sistemde mevcut. Lütfen yeni ürünler ekleyin veya mevcut ürünleri güncelleyin.");
+      } else {
+        toast.error(`İçe aktarma hatası: ${error.message || error.response?.data?.error || "Bilinmeyen hata"}`);
+      }
+    } finally {
+      setProductLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+  // Excel export fonksiyonu - Menü şablonu için
+  const handleMenuTemplateExcelExport = () => {
+    if (!currentTemplateId || templateProducts.length === 0) {
+      toast.error("Dışa aktarılacak ürün bulunamadı");
+      return;
+    }
+
+    // Excel için data hazırla
+    const excelData = templateProducts.map(product => ({
+      "Ürün Adı": product.name,
+      "Kategori": product.category_name,
+      "Görünür": product.is_visible ? "Evet" : "Hayır",
+      "Açıklama": product.description || "",
+      "Fiyat": product.price || 0,
+      "Görsel URL": product.image_url || "",
+      "Ürün ID": product.id
+    }));
+
+    // Excel dosyasını oluştur
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürünler");
+
+    // Dosyayı indir
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+    // Şablon adını al
+    const template = templates[templateTypes.MENU].find(t => t.id === currentTemplateId);
+    const templateName = template ? template.name.replace(/\s+/g, '_') : 'menu_template';
+
+    saveAs(data, `${templateName}.xlsx`);
+
+    toast.success("Excel dosyası indiriliyor...");
+  };
+
+  // Excel import fonksiyonu - Fiyat şablonu için
+  const handlePriceTemplateExcelImport = async (e) => {
+    if (!currentTemplateId) {
+      toast.error("Lütfen önce bir fiyat şablonu seçin");
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setProductLoading(true);
+
+    try {
+      // Önce fiyat şablonunu getir (menu_template_id'yi kontrol için)
+      const templateResponse = await api.get(`/api/templates/price/${currentTemplateId}`);
+      const priceTemplate = templateResponse.data;
+
+      // Excel dosyasını oku
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      console.log("Excel fiyat verisi okundu:", jsonData.slice(0, 3)); // İlk 3 satırı logla
+
+      // Eğer fiyat şablonuna bağlı bir menü şablonu varsa, sadece o menüdeki ürünleri filtrele
+      if (priceTemplate.menu_template_id) {
+        // Menü şablonundaki ürünleri getir
+        const menuProductsResponse = await api.get(`/api/templates/menu/${priceTemplate.menu_template_id}/products`, {
+          params: { onlyTemplateProducts: 'true' }
+        });
+
+        const menuProducts = menuProductsResponse.data;
+        const menuProductNames = menuProducts.map(p => p.name.toLowerCase());
+
+        // JSON verilerini filtrele - sadece menüde olan ürünleri al
+        const filteredJsonData = jsonData.filter(item => {
+          const productName = item['Ürün Adı']?.toLowerCase();
+          return productName && menuProductNames.includes(productName);
+        });
+
+        if (filteredJsonData.length === 0) {
+          toast.warning(`Excel dosyasında seçili menü şablonundaki ürünler bulunamadı. Lütfen menü şablonunuzla uyumlu bir dosya yükleyin.`);
+          setProductLoading(false);
+          return;
+        }
+
+        // Filtrelenmiş verileri API'ye gönder
+        await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, filteredJsonData);
+
+        toast.success(`Fiyat şablonu ürünleri başarıyla içe aktarıldı (${filteredJsonData.length} ürün)`);
+      } else {
+        // Eski davranış: Tüm ürünler için fiyat güncelle
+        await api.post(`/api/templates/price/${currentTemplateId}/products/batch`, jsonData);
+        toast.success("Fiyat şablonu ürünleri başarıyla içe aktarıldı");
+      }
+
+      // Güncel ürünleri yeniden yükle
+      handleManagePriceProducts(currentTemplateId);
+    } catch (error) {
+      console.error("Excel içe aktarılırken hata:", error);
+      console.error("Hata detayları:", error.response?.data || "Detay yok");
+      toast.error("Fiyat şablonu ürünleri içe aktarılamadı");
+    } finally {
+      setProductLoading(false);
+      if (priceFileInputRef.current) {
+        priceFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Excel export fonksiyonu - Fiyat şablonu için
+  const handlePriceTemplateExcelExport = () => {
+    if (!currentTemplateId || templatePriceProducts.length === 0) {
+      toast.error("Dışa aktarılacak ürün bulunamadı");
+      return;
+    }
+
+    // Excel için data hazırla
+    const excelData = templatePriceProducts.map(product => ({
+      "Ürün Adı": product.name,
+      "Kategori": product.category_name,
+      "Fiyat (TL)": product.template_price || product.price || 0,
+      "Ürün ID": product.id
+    }));
+
+    // Excel dosyasını oluştur
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ürün Fiyatları");
+
+    // Dosyayı indir
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+
+    // Şablon adını al
+    const template = templates[templateTypes.PRICE].find(t => t.id === currentTemplateId);
+    const templateName = template ? template.name.replace(/\s+/g, '_') : 'price_template';
+
+    saveAs(data, `${templateName}.xlsx`);
+
+    toast.success("Excel dosyası indiriliyor...");
+  };
+  // Ürünleri filtrele - Menü şablonu için
+  const filteredTemplateProducts = templateProducts.filter(product => {
+    return (
+      (product.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+        product.category_name?.toLowerCase().includes(productFilter.toLowerCase())) &&
+      (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
+    );
+  });
+
+  // Kategorilere göre grupla
+  const productsByCategory = filteredTemplateProducts.reduce((acc, product) => {
+    const categoryId = product.category_id?.toString() || "undefined";
+    const categoryName = product.category_name || "Kategorisiz";
+
+    if (!acc[categoryId]) {
+      acc[categoryId] = {
+        id: categoryId,
+        name: categoryName,
+        products: []
+      };
+    }
+
+    acc[categoryId].products.push(product);
+    return acc;
+  }, {});
+
+  // Ürünleri filtrele - Fiyat şablonu için
+  const filteredTemplatePriceProducts = templatePriceProducts.filter(product => {
+    return (
+      (product.name?.toLowerCase().includes(productFilter.toLowerCase()) ||
+        product.category_name?.toLowerCase().includes(productFilter.toLowerCase())) &&
+      (productCategoryFilter === "" || product.category_id?.toString() === productCategoryFilter)
+    );
+  });
+
+  // Şablon adını getir
+  const getTemplateName = (type, id) => {
+    if (!id) return "-";
+    const template = templates[type]?.find(t => t.id.toString() === id.toString());
+    return template ? template.name : "-";
+  };
+
+  // Tarihi formatlı göster
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Rastgele arka plan rengi oluştur - menü kartları için
+  const getRandomPastelColor = (seed) => {
+    // Seed'i sayıya çevir (basit bir hash)
+    const hash = String(seed).split('').reduce((a, b) => {
+      a = (a << 5) - a + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+
+    // Pastel renkler için hue değerleri
+    const hues = [15, 30, 55, 80, 140, 180, 200, 220, 260, 300, 340]; // Çeşme Kahvecisi temasına uygun tonlar
+    const hue = hues[Math.abs(hash) % hues.length];
+
+    return `hsl(${hue}, 70%, 90%)`;
+  };
+
+  // Menü kartı arka plan resmi
+  const getMenuCardBackground = (templateName, templateId) => {
+    const backgrounds = [
+      '/backgrounds/menu-bg-1.jpg',
+      '/backgrounds/menu-bg-2.jpg',
+      '/backgrounds/menu-bg-3.jpg',
+      '/backgrounds/menu-bg-4.jpg'
+    ];
+
+    // Template ID'ye göre sabit bir arka plan seç (ID değişmediği sürece aynı arka plan kalır)
+    const index = templateId % backgrounds.length;
+    return backgrounds[index] || backgrounds[0];
+  };
+
+  // Fiyat şablonu arka planı
+  const getPriceCardBackground = (templateName, templateId) => {
+    const backgrounds = [
+      '/backgrounds/price-bg-1.jpg',
+      '/backgrounds/price-bg-2.jpg',
+      '/backgrounds/price-bg-3.jpg',
+      '/backgrounds/price-bg-4.jpg'
+    ];
+
+    // Template ID'ye göre sabit bir arka plan seç
+    const index = templateId % backgrounds.length;
+    return backgrounds[index] || backgrounds[0];
+  };
+  return (
+    <div className="container mx-auto px-4 py-6">
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <h1 className="text-2xl font-bold" style={{ color: theme.primary }}>Şablon Yönetimi</h1>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Arama kutusu */}
+            <div className="relative w-full md:w-64">
+              <input
+                type="text"
+                placeholder="Şablon ara..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full p-2 pl-8 border border-gray-300 rounded-lg focus:outline-none"
+                style={{
+                  borderColor: "rgba(2, 43, 69, 0.2)",
+                  boxShadow: "0 1px 3px rgba(2, 43, 69, 0.1)"
+                }}
+              />
+              <HiOutlineDocumentSearch
+                className="absolute left-2 top-2.5"
+                size={20}
+                style={{ color: theme.primary }}
+              />
+            </div>
+
+            {/* Görünüm modu değiştirme */}
+            <div className="flex border rounded-lg overflow-hidden" style={{ borderColor: "rgba(2, 43, 69, 0.2)" }}>
+              <button
+                onClick={() => handleViewModeChange("grid")}
+                className={`px-3 py-2 flex items-center gap-1 ${viewMode === "grid" ? "bg-[#022B45] text-white" : ""}`} title="Kart Görünümü"
+              >
+                <FiGrid size={16} />
+                <span className="text-sm">Kart</span>
+              </button>
+              <button
+                onClick={() => handleViewModeChange("table")}
+                className={`px-3 py-2 flex items-center gap-1 ${viewMode === "table" ? "bg-[#022B45] text-white" : ""}`}
+                title="Liste Görünümü"
+              >
+                <FiList size={16} />
+                <span className="text-sm">Liste</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tablar */}
+        <div className="mb-6">
+          <Tab.Group selectedIndex={activeTab} onChange={handleTabChange}>
+            <Tab.List className="flex space-x-1 rounded-xl p-1" style={{ backgroundColor: theme.light }}>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
+                  ${selected
+                    ? 'bg-white text-[#022B45] shadow-sm'
+                    : 'text-gray-600 hover:bg-white/[0.12] hover:text-[#022B45]'
+                  }`
+                }
+              >
+                Menü Şablonları
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
+                  ${selected
+                    ? 'bg-white text-[#022B45] shadow-sm'
+                    : 'text-gray-600 hover:bg-white/[0.12] hover:text-[#022B45]'
+                  }`
+                }
+              >
+                Fiyat Şablonları
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-lg py-2.5 text-sm font-medium leading-5 
+                  ${selected
+                    ? 'bg-white text-[#022B45] shadow-sm'
+                    : 'text-gray-600 hover:bg-white/[0.12] hover:text-[#022B45]'
+                  }`
+                }
+              >
+                Entegrasyon Şablonları
+              </Tab>
+            </Tab.List>
+
+            <Tab.Panels className="mt-4">
+              {/* Menü Şablonları Panel */}
+              <Tab.Panel>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => handleAddEditTemplate(null, templateTypes.MENU)}
+                    className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: theme.accent,
+                      fontWeight: 600
+                    }}
+                  >
+                    <FiPlus size={18} />
+                    <span>Yeni Menü Şablonu</span>
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : getFilteredTemplates(templateTypes.MENU).length === 0 ? (
+                  <div
+                    className="rounded-lg p-8 text-center"
+                    style={{ backgroundColor: theme.light }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3
+                      className="text-lg font-medium mb-2"
+                      style={{ color: theme.primary }}
+                    >
+                      Menü Şablonu Bulunamadı
+                    </h3>
+                    <p
+                      className="mb-4"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      {searchTerm ? "Arama kriterlerinize uygun şablon bulunmamaktadır." : "Henüz hiç menü şablonu eklenmemiş."}
+                    </p>
+                  </div>
+                ) : viewMode === "grid" ? (
+                  // Kart görünümü
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredTemplates(templateTypes.MENU).map(template => (
+                      <div
+                        key={template.id}
+                        className="rounded-xl overflow-hidden shadow-md transition-all duration-300 hover:shadow-lg border border-gray-200 hover:border-gray-300 h-[320px] flex flex-col relative group"
+                      >
+                        {/* Menü Kartı Görünümü */}
+                        <div
+                          className="h-40 bg-cover bg-center relative flex-shrink-0"
+                          style={{
+                            backgroundImage: `url(${getMenuCardBackground(template.name, template.id)})`,
+                            backgroundColor: getRandomPastelColor(template.id)
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div className="text-center text-white p-5">
+                              <div className="text-2xl font-bold mb-1 shadow-text">MENÜ</div>
+                              <div className="text-xl font-semibold mb-2 tracking-wider shadow-text">{template.name}</div>
+                              {template.is_active && (
+                                <div className="inline-block bg-[#D98A3D] text-white px-3 py-0.5 text-xs rounded-full shadow-sm">
+                                  Aktif
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* İşlem butonları - hover'da görünür */}
+                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInitiateCopy(template, templateTypes.MENU);
+                              }}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-[#022B45] transition-colors shadow-sm"
+                              title="Şablonu Kopyala"
+                            >
+                              <FiCopy size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleAddEditTemplate(template, templateTypes.MENU)}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-[#022B45] transition-colors shadow-sm"
+                              title="Düzenle"
+                            >
+                              <FiEdit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.MENU })}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-red-500 transition-colors shadow-sm"
+                              title="Sil"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        {/* Menü İçeriği */}
+                        <div className="p-5 flex-grow flex flex-col justify-between bg-white">
+                          <div className="space-y-3">
+                            {template.description && (
+                              <p className="text-sm text-gray-600 line-clamp-2">{template.description}</p>
+                            )}
+
+                            <div className="space-y-2">
+                              <div className="flex items-center text-sm text-gray-600 gap-2">
+                                <span className="w-4 h-4 rounded-full bg-[#F4F7F8] flex items-center justify-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#022B45]"></span>
+                                </span>
+                                <span>Oluşturulma: {formatDate(template.created_at)}</span>
+                              </div>
+                              <div className="flex items-center text-sm text-gray-600 gap-2">
+                                <span className="w-4 h-4 rounded-full bg-[#F4F7F8] flex items-center justify-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#022B45]"></span>
+                                </span>
+                                <span>Son güncelleme: {formatDate(template.updated_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Ürün yönetimi butonu */}
+                          <button
+                            onClick={() => handleManageMenuProducts(template.id)}
+                            className="mt-3 w-full py-2.5 bg-[#022B45] text-white rounded-lg font-medium hover:bg-[#022B45]/90 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <FiPackage size={16} />
+                            <span>Ürünleri Yönet</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Tablo görünümü
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Şablon Adı
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Açıklama
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Durum
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Son Güncelleme
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            İşlemler
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {getFilteredTemplates(templateTypes.MENU).map((template) => (
+                          <tr key={template.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-[#022B45] rounded-full flex items-center justify-center text-white font-bold">
+                                  {template.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                                  <div className="text-sm text-gray-500">Menü Şablonu</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 line-clamp-2">{template.description || "-"}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {template.is_active ? 'Aktif' : 'Pasif'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(template.updated_at)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => handleManageMenuProducts(template.id)}
+                                  className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 p-1.5 rounded transition-colors"
+                                  title="Ürünleri Yönet"
+                                >
+                                  <FiPackage size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleAddEditTemplate(template, templateTypes.MENU)}
+                                  className="text-indigo-600 hover:text-indigo-900 bg-indigo-100 hover:bg-indigo-200 p-1.5 rounded transition-colors"
+                                  title="Düzenle"
+                                >
+                                  <FiEdit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.MENU })}
+                                  className="text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 p-1.5 rounded transition-colors"
+                                  title="Sil"
+                                >
+                                  <FiTrash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Tab.Panel>
+              {/* Fiyat Şablonları Panel */}
+              <Tab.Panel>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => handleAddEditTemplate(null, templateTypes.PRICE)}
+                    className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: theme.accent,
+                      fontWeight: 600
+                    }}
+                  >
+                    <FiPlus size={18} />
+                    <span>Yeni Fiyat Şablonu</span>
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : getFilteredTemplates(templateTypes.PRICE).length === 0 ? (
+                  <div
+                    className="rounded-lg p-8 text-center"
+                    style={{ backgroundColor: theme.light }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h3
+                      className="text-lg font-medium mb-2"
+                      style={{ color: theme.primary }}
+                    >
+                      Fiyat Şablonu Bulunamadı
+                    </h3>
+                    <p
+                      className="mb-4"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      {searchTerm ? "Arama kriterlerinize uygun şablon bulunmamaktadır." : "Henüz hiç fiyat şablonu eklenmemiş."}
+                    </p>
+                  </div>
+                ) : viewMode === "grid" ? (
+                  // Kart görünümü
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredTemplates(templateTypes.PRICE).map(template => (
+                      <div
+                        key={template.id}
+                        className="rounded-xl overflow-hidden shadow-md transition-all duration-300 hover:shadow-lg border border-gray-200 hover:border-gray-300 h-[340px] flex flex-col relative group"
+                      >
+                        {/* Fiyat Kartı Görünümü */}
+                        <div
+                          className="h-40 bg-cover bg-center relative flex-shrink-0"
+                          style={{
+                            backgroundImage: `url(${getPriceCardBackground(template.name, template.id)})`,
+                            backgroundColor: getRandomPastelColor(template.id + 100) // Farklı renkler için offset
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div className="text-center text-white p-5">
+                              <div className="text-2xl font-bold mb-1 shadow-text">FİYAT TABLOSU</div>
+                              <div className="text-xl font-semibold mb-2 tracking-wider shadow-text">{template.name}</div>
+                              <div className="text-sm font-medium mb-1 shadow-text">{template.year || new Date().getFullYear()}</div>
+                              {template.is_active && (
+                                <div className="inline-block bg-[#D98A3D] text-white px-3 py-0.5 text-xs rounded-full shadow-sm">
+                                  Aktif
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* İşlem butonları - hover'da görünür */}
+                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInitiateCopy(template, templateTypes.PRICE);
+                              }}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-[#022B45] transition-colors shadow-sm"
+                              title="Şablonu Kopyala"
+                            >
+                              <FiCopy size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleAddEditTemplate(template, templateTypes.PRICE)}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-[#022B45] transition-colors shadow-sm"
+                              title="Düzenle"
+                            >
+                              <FiEdit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.PRICE })}
+                              className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white text-red-500 transition-colors shadow-sm"
+                              title="Sil"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                        {/* Fiyat Şablonu İçeriği */}
+                        <div className="p-5 flex-grow flex flex-col justify-between bg-white h-[200px]">
+                          <div className="space-y-3 overflow-hidden flex-grow">
+                            {template.description && (
+                              <p className="text-sm text-gray-600 line-clamp-2 h-10">{template.description}</p>
+                            )}
+
+                            {/* Menü şablonu bağlantısı */}
+                            <div className="flex items-center mt-2 p-2 rounded-lg border border-blue-100 bg-blue-50">
+                              {template.menu_template_id ? (
+                                <div className="flex items-center gap-2 text-sm text-blue-700 truncate">
+                                  <FiLink size={14} className="text-blue-500 flex-shrink-0" />
+                                  <span className="font-medium">{getTemplateName('menu', template.menu_template_id)}</span>
+                                  <span className="text-xs text-blue-500 truncate">menüsüne bağlı</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                  <MdLinkOff size={14} className="text-gray-400 flex-shrink-0" />
+                                  <span>Menü şablonuna bağlı değil</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-2 hidden sm:block">
+                              <div className="flex items-center text-sm text-gray-600 gap-2">
+                                <span className="w-4 h-4 rounded-full bg-[#F4F7F8] flex items-center justify-center flex-shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#022B45]"></span>
+                                </span>
+                                <span>Oluşturulma: {formatDate(template.created_at)}</span>
+                              </div>
+                              <div className="flex items-center text-sm text-gray-600 gap-2">
+                                <span className="w-4 h-4 rounded-full bg-[#F4F7F8] flex items-center justify-center flex-shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#022B45]"></span>
+                                </span>
+                                <span>Son güncelleme: {formatDate(template.updated_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Fiyat yönetimi butonu */}
+                          <button
+                            onClick={() => handleManagePriceProducts(template.id)}
+                            className="mt-3 w-full py-2.5 bg-[#D98A3D] text-white rounded-lg font-medium hover:bg-[#D98A3D]/90 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <FiSettings size={16} />
+                            <span>Fiyatları Yönet</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Tablo görünümü
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Şablon Adı
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Yıl
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Bağlı Menü
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Durum
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Son Güncelleme
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            İşlemler
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {getFilteredTemplates(templateTypes.PRICE).map((template) => (
+                          <tr key={template.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-[#D98A3D] rounded-full flex items-center justify-center text-white font-bold">
+                                  {template.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                                  <div className="text-sm text-gray-500">Fiyat Şablonu</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{template.year || new Date().getFullYear()}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {template.menu_template_id ? (
+                                <div className="flex items-center text-xs">
+                                  <FiLink className="text-blue-500 mr-1" size={14} />
+                                  <span className="font-medium text-blue-700 bg-blue-50 px-2 py-1 rounded-full">
+                                    {getTemplateName('menu', template.menu_template_id)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500 flex items-center"><MdLinkOff className="mr-1" size={14} /> Bağlantı yok</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {template.is_active ? 'Aktif' : 'Pasif'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDate(template.updated_at)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => handleManagePriceProducts(template.id)}
+                                  className="text-amber-600 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 p-1.5 rounded transition-colors"
+                                  title="Fiyatları Yönet"
+                                >
+                                  <FiSettings size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleAddEditTemplate(template, templateTypes.PRICE)}
+                                  className="text-indigo-600 hover:text-indigo-900 bg-indigo-100 hover:bg-indigo-200 p-1.5 rounded transition-colors"
+                                  title="Düzenle"
+                                >
+                                  <FiEdit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.PRICE })}
+                                  className="text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 p-1.5 rounded transition-colors"
+                                  title="Sil"
+                                >
+                                  <FiTrash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Tab.Panel>
+              {/* Entegrasyon Şablonları Panel */}
+              <Tab.Panel>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => handleAddEditTemplate(null, templateTypes.INTEGRATION)}
+                    className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg transition-colors"
+                    style={{
+                      backgroundColor: theme.accent,
+                      fontWeight: 600
+                    }}
+                  >
+                    <FiPlus size={18} />
+                    <span>Yeni Entegrasyon</span>
+                  </button>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div
+                      className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                      style={{ borderColor: theme.primary }}
+                    ></div>
+                  </div>
+                ) : getFilteredTemplates(templateTypes.INTEGRATION).length === 0 ? (
+                  <div
+                    className="rounded-lg p-8 text-center"
+                    style={{ backgroundColor: theme.light }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-16 w-16 mx-auto mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                    </svg>
+                    <h3
+                      className="text-lg font-medium mb-2"
+                      style={{ color: theme.primary }}
+                    >
+                      Entegrasyon Şablonu Bulunamadı
+                    </h3>
+                    <p
+                      className="mb-4"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      {searchTerm ? "Arama kriterlerinize uygun entegrasyon bulunmamaktadır." : "Henüz hiç entegrasyon şablonu eklenmemiş."}
+                    </p>
+                  </div>
+                ) : viewMode === "grid" ? (
+                  // Kart görünümü
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredTemplates(templateTypes.INTEGRATION).map(template => (
+                      <div
+                        key={template.id}
+                        className="rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 hover:border-gray-300 flex flex-col group relative"
+                      >
+                        <div className="bg-gray-700 text-white p-4 flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-shrink-0 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                              {template.type === 'delivery' && '🚚'}
+                              {template.type === 'payment' && '💳'}
+                              {template.type === 'order' && '📋'}
+                              {template.type === 'menu' && '🍽️'}
+                              {template.type === 'other' && '🔗'}
+                            </div>
+                            <div>
+                              <h3 className="font-bold">{template.name}</h3>
+                              <p className="text-xs text-gray-300 uppercase tracking-wide">
+                                {template.type === 'delivery' && 'Teslimat Entegrasyonu'}
+                                {template.type === 'payment' && 'Ödeme Entegrasyonu'}
+                                {template.type === 'order' && 'Sipariş Entegrasyonu'}
+                                {template.type === 'menu' && 'Menü Entegrasyonu'}
+                                {template.type === 'other' && 'Diğer Entegrasyon'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* İşlem butonları - hover'da görünür */}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleAddEditTemplate(template, templateTypes.INTEGRATION)}
+                              className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                              title="Düzenle"
+                            >
+                              <FiEdit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.INTEGRATION })}
+                              className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                              title="Sil"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-white flex-grow">
+                          {template.description && (
+                            <p className="text-sm text-gray-600 mb-4">{template.description}</p>
+                          )}
+
+                          <div className="space-y-3">
+                            {/* API Konfigürasyonu */}
+                            <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+                              <h4 className="text-xs uppercase text-gray-500 mb-2 font-semibold">Entegrasyon Bilgileri</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                {template.config?.api_key && (
+                                  <div className="col-span-2">
+                                    <p className="text-xs text-gray-500">API Anahtarı</p>
+                                    <p className="text-sm font-mono truncate bg-gray-100 p-1 rounded">
+                                      {template.config.api_key.substring(0, 8)}...
+                                    </p>
+                                  </div>
+                                )}
+
+                                {template.config?.endpoint && (
+                                  <div className="col-span-2">
+                                    <p className="text-xs text-gray-500">Endpoint</p>
+                                    <p className="text-sm font-mono truncate bg-gray-100 p-1 rounded">
+                                      {template.config.endpoint}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm pt-2 border-t">
+                              <span className="text-gray-500">Durum</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {template.is_active ? 'Aktif' : 'Pasif'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Tablo görünümü
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Entegrasyon Adı
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tip
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Endpoint
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Durum
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            İşlemler
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {getFilteredTemplates(templateTypes.INTEGRATION).map((template) => (
+                          <tr key={template.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10 bg-gray-700 text-white rounded-full flex items-center justify-center text-lg">
+                                  {template.type === 'delivery' && '🚚'}
+                                  {template.type === 'payment' && '💳'}
+                                  {template.type === 'order' && '📋'}
+                                  {template.type === 'menu' && '🍽️'}
+                                  {template.type === 'other' && '🔗'}
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                                  <div className="text-sm text-gray-500 truncate max-w-xs">{template.description || "Açıklama yok"}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                {template.type === 'delivery' && 'Teslimat'}
+                                {template.type === 'payment' && 'Ödeme'}
+                                {template.type === 'order' && 'Sipariş'}
+                                {template.type === 'menu' && 'Menü'}
+                                {template.type === 'other' && 'Diğer'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {template.config?.endpoint ? (
+                                <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-xs inline-block">
+                                  {template.config.endpoint}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                {template.is_active ? 'Aktif' : 'Pasif'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleInitiateCopy(template, templateTypes.INTEGRATION);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 p-1.5 rounded transition-colors"
+                                  title="Şablonu Kopyala"
+                                >
+                                  <FiCopy size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleAddEditTemplate(template, templateTypes.INTEGRATION)}
+                                  className="text-indigo-600 hover:text-indigo-900 bg-indigo-100 hover:bg-indigo-200 p-1.5 rounded transition-colors"
+                                  title="Düzenle"
+                                >
+                                  <FiEdit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDelete({ id: template.id, type: templateTypes.INTEGRATION })}
+                                  className="text-red-600 hover:text-red-900 bg-red-100 hover:bg-red-200 p-1.5 rounded transition-colors"
+                                  title="Sil"
+                                >
+                                  <FiTrash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Tab.Panel>
+            </Tab.Panels>
+          </Tab.Group>
+        </div>
+
+        {/* Kendi TemplateModal bileşenimizi kullanacağız - kodu temizledik */}
+        {/* TemplateModal yerine kendi bileşenimizi kullanacağız */}
+        {/* Modal bileşenleri - Zustand ile */}
+        <ProductModal
+          isOpen={modals.productModal}
+          onClose={() => closeModal('productModal')}
+          currentTemplateId={currentTemplateId}
+          onProductAdded={() => handleManageMenuProducts(currentTemplateId)}
+          categories={categories}
+          initialProduct={useModalStore(state => state.editingProduct)}
+        />
+        
+        {/* TemplateModal bileşeni - Zustand ile */}
+        <TemplateModal
+          isOpen={modals.templateModal}
+          onClose={() => closeModal('templateModal')}
+          template={currentTemplate}
+          type={currentTemplateType}
+          templates={templates}
+          onTemplateAdded={(updatedTemplate) => {
+            const templateType = currentTemplateType;
+            const updatedTemplates = { ...templates };
+            const existingIndex = updatedTemplates[templateType].findIndex(t => t.id === updatedTemplate.id);
+            
+            if (existingIndex !== -1) {
+              // Var olan şablonu güncelle
+              updatedTemplates[templateType][existingIndex] = updatedTemplate;
+            } else {
+              // Yeni şablon ekle
+              updatedTemplates[templateType].push(updatedTemplate);
+            }
+            
+            setTemplates(updatedTemplates);
+          }}
+        />
+        
+        {/* Entegrasyon şablonu için TemplateModal - Zustand ile */}
+        <TemplateModal
+          isOpen={modals.integrationModal}
+          onClose={() => closeModal('integrationModal')}
+          template={currentTemplate}
+          type={templateTypes.INTEGRATION}
+          templates={templates}
+          onTemplateAdded={(updatedTemplate) => {
+            const updatedTemplates = { ...templates };
+            const existingIndex = updatedTemplates[templateTypes.INTEGRATION].findIndex(t => t.id === updatedTemplate.id);
+            
+            if (existingIndex !== -1) {
+              // Var olan şablonu güncelle
+              updatedTemplates[templateTypes.INTEGRATION][existingIndex] = updatedTemplate;
+            } else {
+              // Yeni şablon ekle
+              updatedTemplates[templateTypes.INTEGRATION].push(updatedTemplate);
+            }
+            
+            setTemplates(updatedTemplates);
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default EnhancedTemplateManager;

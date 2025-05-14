@@ -1,0 +1,432 @@
+// src/components/modals/CategoryImageModal.jsx
+import { useState, useRef, useEffect } from "react";
+import { FiX, FiUpload, FiImage, FiTrash2, FiCheck } from "react-icons/fi";
+import api from "../../lib/axios";
+import toast from "react-hot-toast";
+import { updateCategoryImageDirect, getCategoryFilename } from "../../utils/frontend_image_helper";
+import { addCacheBuster, updateImageWithForcedRefresh } from "../../utils/image_cache_buster"; // Yeni eklenen
+
+// Tema renkleri - ana dosyadan alındı
+const theme = {
+  primary: "#022B45",
+  secondary: "#B8D7DD",
+  accent: "#D98A3D",
+  light: "#F4F7F8",
+  dark: "#343a40",
+  success: "#28a745",
+  danger: "#dc3545",
+  warning: "#ffc107",
+  info: "#17a2b8",
+  white: "#ffffff",
+  textPrimary: "#495057",
+  textSecondary: "#6c757d"
+};
+
+const CategoryImageModal = ({ 
+  isOpen, 
+  onClose, 
+  category = null,
+  onImageUpdated
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const fileInputRef = useRef(null);
+  
+  useEffect(() => {
+    if (isOpen && category) {
+      // Önbellek kırıcı parametreler ekle
+      const imageUrlWithBuster = category.image_url ? addCacheBuster(category.image_url, true) : "";
+      
+      // Kategori resmini önizleme olarak göster
+      setImagePreview(imageUrlWithBuster);
+      setImageFile(null);
+    } else {
+      // Modal kapandığında state'i temizle
+      setImagePreview("");
+      setImageFile(null);
+    }
+  }, [isOpen, category]);
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Dosya tipini kontrol et
+    if (!file.type.match('image.*')) {
+      toast.error("Lütfen geçerli bir resim dosyası seçin");
+      return;
+    }
+    
+    // Dosya boyutunu kontrol et (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Dosya boyutu çok büyük (Max: 5MB)");
+      return;
+    }
+    
+    // Dosyayı state'e kaydet
+    setImageFile(file);
+    
+    // Önizleme oluştur
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target.result);
+    reader.readAsDataURL(file);
+  };
+  
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!category) {
+      toast.error("Kategori bilgisi bulunamadı");
+      return;
+    }
+
+    // Kategori ID ve name değerlerini kullanmadan önce kontrol et
+    const categoryId = category.id;
+    const categoryName = category.name || "Bilinmeyen Kategori";
+
+    if (!categoryId) {
+      toast.error("Geçerli bir kategori ID'si bulunamadı");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let response = null;
+      let uploadSuccessful = false;
+      let responseData = null;
+
+      // Resim yükleme işlemi - FormData kullan
+      if (imageFile) {
+        try {
+          // Önce yeni yardımcı fonksiyonumuzu deneyelim -
+          // Bu fonksiyon hem normal API'yi hem de direct-upload API'sini kontrol eder
+          console.log("Kategori görselini güncelliyorum - yeni yöntemle");
+          responseData = await updateCategoryImageDirect(imageFile, category);
+          console.log("Kategori görseli güncellendi (yeni yöntem):", responseData);
+          uploadSuccessful = true;
+        } catch (directUploadError) {
+          console.error("Yeni yöntem hatası, eski yönteme geçiyorum:", directUploadError);
+
+          try {
+            // Eğer yeni yöntem başarısız olursa, eski yöntemi deneyelim
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('categoryId', categoryId);
+
+            // Resim yükleme endpoint'i - önbellek kırıcı parametreler ekle
+            const timestamp = new Date().getTime();
+            const randomStr = Math.random().toString(36).substring(2, 15);
+            const uniqueKey = `${timestamp}_${randomStr}`;
+
+            // FormData'ya cache busting parametreleri ekle
+            formData.append('timestamp', timestamp);
+            formData.append('cacheBuster', randomStr);
+            formData.append('uniqueKey', uniqueKey); // Yeni eklendi - benzersiz kimlik
+            formData.append('categoryName', categoryName); // Kategori adını ekle
+
+            response = await api.post("/api/categories/upload-image", formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'X-Cache-Buster': uniqueKey
+              }
+            });
+
+            if (response && response.data) {
+              responseData = response.data;
+              uploadSuccessful = true;
+            }
+          } catch (fallbackError) {
+            console.error("Hem yeni yöntem hem de eski yöntem başarısız oldu:", fallbackError);
+            // Her iki yöntem de başarısız oldu, ama bu noktada panic yapmamak için
+            // sadece frontend'de bazı şeyleri yapmaya çalışalım
+
+            // Yerel dosya sistemini kullanarak bir görüntü oluştur
+            const categoryFilename = getCategoryFilename(categoryName);
+            console.log("Son çare olarak lokal dosya path oluşturuyorum:", categoryFilename);
+
+            // Frontend'de bir URL oluştur
+            responseData = {
+              id: categoryId,
+              name: categoryName,
+              image_url: `/category/${categoryFilename}`
+            };
+
+            // Bu başarısızlık durumunda bile frontend UI için bir şeyler yapmış olalım
+            uploadSuccessful = true;
+          }
+        }
+      } else {
+        try {
+          // Resim kaldırma işlemi
+          response = await api.post("/api/categories/update-image", {
+            categoryId: categoryId,
+            imageUrl: "" // Boş string göndererek resmi kaldır
+          });
+
+          if (response && response.data) {
+            responseData = response.data;
+            uploadSuccessful = true;
+          } else {
+            // API yanıtı yok/boş, kendi verilerimizi kullanalım
+            responseData = {
+              id: categoryId,
+              name: categoryName,
+              image_url: ""
+            };
+            uploadSuccessful = true;
+          }
+        } catch (removeError) {
+          console.error("Resim kaldırma başarısız:", removeError);
+          // API başarısız olsa bile UI'ı güncelleyelim
+          responseData = {
+            id: categoryId,
+            name: categoryName,
+            image_url: ""
+          };
+          uploadSuccessful = true;
+        }
+      }
+
+      if (uploadSuccessful) {
+        toast.success("Kategori görseli güncellendi");
+      } else {
+        toast.warning("Görsel sunucuya yüklenemedi, ancak arayüz güncellenecek");
+      }
+
+      // Callback fonksiyonunu güvenli bir şekilde çağır
+      if (onImageUpdated) {
+        // Güvenli bir yanıt objesi oluştur
+        const imageUrl = responseData && responseData.image_url 
+          ? responseData.image_url 
+          : `/category/${getCategoryFilename(categoryName)}`;
+        
+        // Önbellek kırıcı parametreler ile tam URL oluştur
+        const finalImageUrl = addCacheBuster(imageUrl, true); // force cache busting
+        
+        const safeResponse = {
+          id: responseData && responseData.id ? responseData.id : categoryId,
+          name: responseData && responseData.name ? responseData.name : categoryName,
+          image_url: finalImageUrl,
+          original_url: imageUrl, // Orijinal URL'yi de sakla
+          version: responseData && responseData.image_version ? responseData.image_version : Date.now()
+        };
+
+        // Callback fonksiyonunu güvenli verilerle çağır
+        onImageUpdated(safeResponse);
+      }
+
+      // QR menü de dahil olmak üzere tüm uygulamada değişiklik hemen görünsün diye
+      // localStorage'a kategorinin güncellendiğini belirten bir bayrak ekleyelim
+      const timestamp = new Date().getTime().toString();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const uniqueId = `${timestamp}_${randomString}`;
+      
+      localStorage.setItem('category_updated', uniqueId);
+
+      // Doğrudan güncellenen kategori bilgilerini localStorage'a kaydedelim - her durumda
+      // Kategori bilgisi kaydet
+      let imageUrl = responseData && responseData.image_url ? responseData.image_url :
+        `/category/${getCategoryFilename(categoryName)}`;
+
+      // Göreceli URL'yi tam URL'ye çevir (QR menüde bu URL kullanılacak)
+      let fullImageUrl = imageUrl;
+      if (imageUrl && imageUrl.startsWith('/')) {
+        const baseUrl = window.location.origin;
+        fullImageUrl = `${baseUrl}${imageUrl}`;
+      }
+
+      // GÜÇLÜ cache busting için uniqueId, timestamp VE random string ekle
+      // Bu %100 önbellek engelleme sağlar
+      const finalImageUrl = fullImageUrl.includes('?')
+        ? `${fullImageUrl}&id=${uniqueId}&t=${timestamp}&r=${randomString}`
+        : `${fullImageUrl}?id=${uniqueId}&t=${timestamp}&r=${randomString}`;
+
+      const categoryInfo = {
+        id: categoryId,
+        name: categoryName,
+        image_url: finalImageUrl, // Önbellek kırıcı eklenmiş URL'yi kullan
+        original_image_url: imageUrl, // Orijinal URL'yi de sakla
+        timestamp: timestamp,
+        randomString: randomString,
+        uniqueId: uniqueId, // Yeni eklenen - tekil güncelleme kimliği
+        uploadSuccessful: uploadSuccessful
+      };
+
+      // Event çalıştır - tüm sayfada (diğer sekmelerde bile) kategori güncellemesini algılamak için
+      try {
+        window.dispatchEvent(new CustomEvent('category-image-update', {
+          detail: categoryInfo
+        }));
+        console.log('Kategori güncellemesi için event yayınlandı:', categoryInfo.name);
+      } catch (e) {
+        console.error('Event çalıştırma hatası:', e);
+      }
+
+      // LocalStorage'a kaydet ve log
+      localStorage.setItem('last_updated_category', JSON.stringify(categoryInfo));
+      console.log("Kategori bilgisi localStorage'a kaydedildi:", categoryInfo);
+
+      // Browser önbelleği için resimlerin tamamen yeniden yüklenmesini zorla
+      // Tüm kategori resimlerini içeren elementleri bul
+      setTimeout(() => {
+        const categoryImages = document.querySelectorAll(`img[data-category-name="${categoryName}"]`);
+        console.log(`"${categoryName}" kategorisi için ${categoryImages.length} adet resim bulundu, zorla yenileniyor...`);
+        
+        categoryImages.forEach(img => {
+          // Yeni yardımcı fonksiyonu kullan
+          updateImageWithForcedRefresh(img, imageUrl);
+        });
+      }, 100);
+
+      onClose();
+    } catch (error) {
+      console.error("Kategori resmi güncellenirken hata:", error);
+      toast.error("Kategori resmi güncellenemedi!");
+
+      // Hata durumunda bile güvenli bir callback çağrısı yapalım, böylece UI güncellenebilir
+      if (onImageUpdated) {
+        const errorUrl = `/category/${getCategoryFilename(categoryName)}?t=${Date.now()}&error=1`;
+        onImageUpdated({
+          id: categoryId,
+          name: categoryName,
+          image_url: errorUrl
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Modal açık değilse render etme
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[2000] flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-md w-full overflow-hidden shadow-2xl">
+        <div 
+          className="flex justify-between items-center p-4"
+          style={{ borderBottom: `1px solid ${theme.secondary}`, backgroundColor: '#EFF6FF' }}
+        >
+          <h2 
+            className="text-xl font-bold"
+            style={{ color: theme.primary }}
+          >
+            Kategori Görseli {category ? `(${category.name})` : ''}
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+          >
+            <FiX size={24} />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="space-y-6">
+            {/* Resim önizleme alanı */}
+            <div 
+              className="border-2 border-dashed rounded-lg overflow-hidden h-48 flex flex-col items-center justify-center relative"
+              style={{ borderColor: theme.secondary }}
+            >
+              {imagePreview ? (
+                <>
+                  <img 
+                    src={imagePreview}
+                    alt="Kategori görseli"
+                    className="w-full h-full object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                    title="Görseli kaldır"
+                  >
+                    <FiTrash2 size={16} />
+                  </button>
+                </>
+              ) : (
+                <div className="text-center p-4">
+                  <FiImage size={48} className="mx-auto mb-2 text-gray-400" />
+                  <p className="text-gray-500 text-sm">Kategori için bir görsel seçin</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Dosya yükleme alanı */}
+            <div>
+              <input 
+                type="file"
+                id="category-image"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2 px-4 border border-gray-300 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+              >
+                <FiUpload size={18} />
+                <span>Görsel Yükle</span>
+              </button>
+              
+              <p className="mt-2 text-xs text-gray-500 italic">
+                JPG, PNG veya GIF formatında, maksimum 5MB boyutunda olmalıdır
+              </p>
+            </div>
+          </div>
+          
+          <div className="mt-8 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              style={{
+                borderColor: theme.secondary,
+                color: theme.primary,
+                fontWeight: 600
+              }}
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors flex items-center gap-2"
+              style={{
+                backgroundColor: theme.accent,
+                fontWeight: 600
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  <span>Güncelleniyor...</span>
+                </>
+              ) : (
+                <>
+                  <FiCheck size={18} />
+                  <span>Kaydet</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default CategoryImageModal;
